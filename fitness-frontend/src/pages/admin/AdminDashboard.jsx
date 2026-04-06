@@ -66,7 +66,7 @@ export default function AdminDashboard() {
       {/* Заголовок */}
       <div>
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Дашборд</h1>
-        <p className="text-sm text-zinc-400 mt-0.5">Сегодня, 29 марта 2025</p>
+        <p className="text-sm text-zinc-400 mt-0.5">Сегодня, 29 марта 2026</p>
       </div>
 
       {/* KPI карточки */}
