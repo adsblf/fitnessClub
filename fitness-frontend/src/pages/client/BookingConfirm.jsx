@@ -1,151 +1,190 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { scheduleClasses } from "../../data/mock";
-
-const LEVEL_COLOR = {
-  "Начинающий":  "bg-emerald-100 text-emerald-700",
-  "Средний":     "bg-amber-100 text-amber-700",
-  "Продвинутый": "bg-red-100 text-red-600",
-};
+import { useAuth } from "../../context/AuthContext";
+import { scheduleApi } from "../../api/schedule";
+import { bookingsApi } from "../../api/bookings";
 
 export default function BookingConfirm() {
-  const { id } = useParams();
-  const { state } = useLocation();
-  const navigate = useNavigate();
-  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+    const { id } = useParams();
+    const { state } = useLocation();
+    const navigate = useNavigate();
+    const { user } = useAuth();
 
-  // Берём класс из state (если пришли с расписания) или ищем в моках
-  const cls = state?.cls ?? scheduleClasses.find((c) => c.id === Number(id));
+    const [session, setSession] = useState(state?.session ?? null);
+    const [loading, setLoading] = useState(!state?.session);
+    const [status, setStatus] = useState("idle"); // idle | loading | success | error
+    const [error, setError] = useState(null);
 
-  if (!cls) {
-    return (
-      <div className="p-6 text-sm text-zinc-400">Занятие не найдено.{" "}
-        <button className="underline" onClick={() => navigate("/client/schedule")}>Назад</button>
-      </div>
-    );
-  }
+    useEffect(() => {
+        if (session) return;
+        scheduleApi
+            .get(id)
+            .then((r) => setSession(r.data.data))
+            .catch(() => setError("Занятие не найдено"))
+            .finally(() => setLoading(false));
+    }, [id, session]);
 
-  const free = cls.capacity - cls.booked;
-  const date = new Date(cls.date).toLocaleDateString("ru-RU", {
-    weekday: "long", day: "numeric", month: "long",
-  });
+    async function handleConfirm() {
+        setStatus("loading");
+        setError(null);
+        try {
+            await bookingsApi.create({
+                client_id: user.id,
+                session_id: Number(id),
+            });
+            setStatus("success");
+        } catch (err) {
+            setError(err.response?.data?.message || "Ошибка записи");
+            setStatus("error");
+        }
+    }
 
-  function handleConfirm() {
-    setStatus("loading");
-    // Имитируем запрос к API
-    setTimeout(() => setStatus("success"), 1200);
-  }
+    if (loading) return <div className="p-6 text-sm text-zinc-400">Загрузка...</div>;
 
-  // ---- Экран успеха ----
-  if (status === "success") {
-    return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl mb-4">✓</div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Запись подтверждена!</h2>
-        <p className="text-sm text-zinc-400 mb-2">
-          Вы записаны на <strong className="text-zinc-700 dark:text-zinc-300">{cls.name}</strong>
-        </p>
-        <p className="text-sm text-zinc-400 mb-8">
-          {date}, {cls.time} · {cls.hall}
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate("/client")}
-            className="px-4 py-2 text-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:opacity-80 transition-opacity"
-          >
-            На главную
-          </button>
-          <button
-            onClick={() => navigate("/client/schedule")}
-            className="px-4 py-2 text-sm border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-          >
-            К расписанию
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Экран подтверждения ----
-  return (
-    <div className="p-6 max-w-xl">
-      {/* Breadcrumb */}
-      <button
-        onClick={() => navigate(-1)}
-        className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 mb-6 flex items-center gap-1"
-      >
-        ← Назад к расписанию
-      </button>
-
-      <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-6">Запись на занятие</h1>
-
-      {/* Карточка занятия */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 mb-4">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <div className="font-semibold text-zinc-900 dark:text-zinc-100">{cls.name}</div>
-            <div className="text-sm text-zinc-400 mt-0.5">{cls.trainer}</div>
-          </div>
-          <span className={`text-xs px-2 py-0.5 rounded font-medium ${LEVEL_COLOR[cls.level]}`}>
-            {cls.level}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3">
-            <div className="text-xs text-zinc-400 mb-0.5">Дата и время</div>
-            <div className="text-zinc-800 dark:text-zinc-200 font-medium capitalize">{date}</div>
-            <div className="text-zinc-500">{cls.time} · {cls.duration} мин</div>
-          </div>
-          <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3">
-            <div className="text-xs text-zinc-400 mb-0.5">Место</div>
-            <div className="text-zinc-800 dark:text-zinc-200 font-medium">{cls.hall}</div>
-            <div className="text-zinc-500">
-              Свободных мест: <span className={free <= 3 ? "text-amber-500 font-medium" : "text-emerald-600 font-medium"}>{free}</span>
+    if (!session && error) {
+        return (
+            <div className="p-6 text-sm text-zinc-400">
+                {error}.{" "}
+                <button className="underline" onClick={() => navigate("/client/schedule")}>
+                    Назад
+                </button>
             </div>
-          </div>
-        </div>
+        );
+    }
 
-        {cls.description && (
-          <p className="text-xs text-zinc-400 mt-4 leading-relaxed">{cls.description}</p>
-        )}
-      </div>
+    if (!session) return null;
 
-      {/* Блок клиента */}
-      <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 mb-6 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-sm font-medium text-zinc-600 dark:text-zinc-300">
-          ЕМ
-        </div>
-        <div>
-          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Елена Мишина</div>
-          <div className="text-xs text-zinc-400">Абонемент: Безлимитный · действует до 15.08.2025</div>
-        </div>
-      </div>
+    const free = session.available_slots;
+    const date = new Date(session.date).toLocaleDateString("ru-RU", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+    });
 
-      {/* Предупреждение о малом количестве мест */}
-      {free <= 3 && free > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4 text-xs text-amber-700 dark:text-amber-400">
-          ⚠️ Осталось мало мест — запишитесь сейчас, чтобы не потерять возможность.
-        </div>
-      )}
+    if (status === "success") {
+        return (
+            <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl mb-4">
+                    ✓
+                </div>
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+                    Запись подтверждена!
+                </h2>
+                <p className="text-sm text-zinc-400 mb-2">
+                    Вы записаны на{" "}
+                    <strong className="text-zinc-700 dark:text-zinc-300">
+                        {session.name ?? "Персональную тренировку"}
+                    </strong>
+                </p>
+                <p className="text-sm text-zinc-400 mb-8">
+                    {date}, {session.time_start} · Зал {session.hall?.number}
+                </p>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => navigate("/client")}
+                        className="px-4 py-2 text-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:opacity-80"
+                    >
+                        На главную
+                    </button>
+                    <button
+                        onClick={() => navigate("/client/schedule")}
+                        className="px-4 py-2 text-sm border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
+                        К расписанию
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
-      {/* Кнопки */}
-      <div className="flex gap-3">
-        <button
-          onClick={handleConfirm}
-          disabled={status === "loading"}
-          className="flex-1 py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:opacity-80 disabled:opacity-50 transition-opacity"
-        >
-          {status === "loading" ? "Записываемся..." : "Подтвердить запись"}
-        </button>
-        <button
-          onClick={() => navigate(-1)}
-          disabled={status === "loading"}
-          className="px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-        >
-          Отмена
-        </button>
-      </div>
-    </div>
-  );
+    return (
+        <div className="p-6 max-w-xl">
+            <button
+                onClick={() => navigate(-1)}
+                className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 mb-6 flex items-center gap-1"
+            >
+                ← Назад к расписанию
+            </button>
+
+            <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
+                Запись на занятие
+            </h1>
+
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 mb-4">
+                <div className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+                    {session.name ?? "Персональная тренировка"}
+                </div>
+                <div className="text-sm text-zinc-400 mb-4">{session.trainer?.full_name}</div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3">
+                        <div className="text-xs text-zinc-400 mb-0.5">Дата и время</div>
+                        <div className="text-zinc-800 dark:text-zinc-200 font-medium capitalize">{date}</div>
+                        <div className="text-zinc-500">
+                            {session.time_start}–{session.time_end} · {session.duration} мин
+                        </div>
+                    </div>
+                    <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3">
+                        <div className="text-xs text-zinc-400 mb-0.5">Место</div>
+                        <div className="text-zinc-800 dark:text-zinc-200 font-medium">
+                            Зал {session.hall?.number}
+                        </div>
+                        {free != null && (
+                            <div className="text-zinc-500">
+                                Свободных мест:{" "}
+                                <span className={free <= 3 ? "text-amber-500 font-medium" : "text-emerald-600 font-medium"}>
+                  {free}
+                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 mb-6 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                    {user?.full_name
+                        ?.split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2) ?? "?"}
+                </div>
+                <div>
+                    <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                        {user?.full_name}
+                    </div>
+                    <div className="text-xs text-zinc-400">{user?.email}</div>
+                </div>
+            </div>
+
+            {free != null && free <= 3 && free > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4 text-xs text-amber-700 dark:text-amber-400">
+                    Осталось мало мест — запишитесь сейчас!
+                </div>
+            )}
+
+            {error && (
+                <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4 text-sm text-red-600">
+                    {error}
+                </div>
+            )}
+
+            <div className="flex gap-3">
+                <button
+                    onClick={handleConfirm}
+                    disabled={status === "loading"}
+                    className="flex-1 py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:opacity-80 disabled:opacity-50"
+                >
+                    {status === "loading" ? "Записываемся..." : "Подтвердить запись"}
+                </button>
+                <button
+                    onClick={() => navigate(-1)}
+                    disabled={status === "loading"}
+                    className="px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                >
+                    Отмена
+                </button>
+            </div>
+        </div>
+    );
 }
