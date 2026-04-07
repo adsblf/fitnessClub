@@ -16,4 +16,7 @@ export const membershipsApi = {
     unfreeze(id) {
         return api.post(`/memberships/${id}/unfreeze`);
     },
+    cancel(id) {
+        return api.post(`/memberships/${id}/cancel`);
+    },
 };

@@ -16,24 +16,21 @@ class ClientController extends Controller
 {
     /**
      * GET /api/v1/clients
-     * Список всех клиентов с пагинацией и поиском.
      */
     public function index(Request $request): JsonResponse
     {
         $query = Client::with(['person.user', 'memberships.membershipType']);
 
-        // Поиск по ФИО, телефону или email
         if ($search = $request->query('search')) {
             $query->whereHas('person', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhereHas('user', function ($q2) use ($search) {
-                      $q2->where('email', 'like', "%{$search}%");
-                  });
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($q2) use ($search) {
+                        $q2->where('email', 'like', "%{$search}%");
+                    });
             });
         }
 
-        // Фильтр по статусу
         if ($status = $request->query('status')) {
             $query->where('status', $status);
         }
@@ -54,31 +51,32 @@ class ClientController extends Controller
 
     /**
      * POST /api/v1/clients
-     * Создать нового клиента (администратор создаёт вручную).
      */
     public function store(ClientRequest $request): JsonResponse
     {
         $data = $request->validated();
 
-        // 1. Создаём пользователя
         $user = User::create([
             'email'    => $data['email'],
             'password' => Hash::make($data['password'] ?? 'password'),
         ]);
 
-        // 2. Назначаем роль
         $clientRole = Role::where('name', 'client')->first();
         $user->roles()->attach($clientRole);
 
-        // 3. Профиль
         $person = Person::create([
-            'user_id'    => $user->id,
-            'full_name'  => $data['full_name'],
-            'phone'      => $data['phone'] ?? null,
-            'birth_date' => $data['birth_date'] ?? null,
+            'user_id'                  => $user->id,
+            'full_name'                => $data['full_name'],
+            'phone'                    => $data['phone'] ?? null,
+            'birth_date'               => $data['birth_date'] ?? null,
+            'passport_series'          => $data['passport_series'] ?? null,
+            'passport_number'          => $data['passport_number'] ?? null,
+            'passport_issued_at'       => $data['passport_issued_at'] ?? null,
+            'passport_issued_by'       => $data['passport_issued_by'] ?? null,
+            'passport_department_code' => $data['passport_department_code'] ?? null,
+            'registration_address'     => $data['registration_address'] ?? null,
         ]);
 
-        // 4. Клиент
         $client = Client::create([
             'person_id'         => $person->id,
             'registration_date' => now()->toDateString(),
@@ -95,7 +93,6 @@ class ClientController extends Controller
 
     /**
      * GET /api/v1/clients/{id}
-     * Получить профиль клиента с абонементами и статистикой.
      */
     public function show(int $id): JsonResponse
     {
@@ -109,52 +106,56 @@ class ClientController extends Controller
 
         $data = $this->formatClient($client);
 
-        // Добавляем расширенные данные
         $data['card'] = $client->card ? [
-            'training_goal'    => $client->card->training_goal,
-            'current_weight'   => $client->card->current_weight,
-            'height'           => $client->card->height,
-            'bmi'              => $client->card->getBmi(),
+            'training_goal'     => $client->card->training_goal,
+            'current_weight'    => $client->card->current_weight,
+            'height'            => $client->card->height,
+            'bmi'               => $client->card->getBmi(),
             'contraindications' => $client->card->contraindications,
-            'trainer_notes'    => $client->card->trainer_notes,
+            'trainer_notes'     => $client->card->trainer_notes,
         ] : null;
 
-        $data['total_visits'] = $client->visits->count();
-
-        $data['active_bookings'] = $client->bookings
-            ->where('status', '!=', 'cancelled')
-            ->count();
+        $data['total_visits']    = $client->visits->count();
+        $data['active_bookings'] = $client->bookings->where('status', '!=', 'cancelled')->count();
 
         return response()->json(['data' => $data]);
     }
 
     /**
      * PUT /api/v1/clients/{id}
-     * Обновить данные клиента.
      */
     public function update(ClientRequest $request, int $id): JsonResponse
     {
         $client = Client::with('person.user')->findOrFail($id);
         $data = $request->validated();
 
-        // Обновляем person
-        $personData = array_filter([
-            'full_name'  => $data['full_name'] ?? null,
-            'phone'      => $data['phone'] ?? null,
-            'birth_date' => $data['birth_date'] ?? null,
-        ]);
-
+        // Используем array_key_exists, чтобы корректно обнулять поля (передавать null)
+        $personFields = [
+            'full_name',
+            'phone',
+            'birth_date',
+            'passport_series',
+            'passport_number',
+            'passport_issued_at',
+            'passport_issued_by',
+            'passport_department_code',
+            'registration_address',
+        ];
+        $personData = [];
+        foreach ($personFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $personData[$field] = $data[$field] === '' ? null : $data[$field];
+            }
+        }
         if (!empty($personData)) {
             $client->person->update($personData);
         }
 
-        // Обновляем email если передан
-        if (isset($data['email'])) {
+        if (array_key_exists('email', $data)) {
             $client->person->user->update(['email' => $data['email']]);
         }
 
-        // Обновляем статус клиента если передан
-        if (isset($data['status'])) {
+        if (array_key_exists('status', $data)) {
             $client->update(['status' => $data['status']]);
         }
 
@@ -168,18 +169,13 @@ class ClientController extends Controller
 
     /**
      * DELETE /api/v1/clients/{id}
-     * Удалить клиента (каскадно удалит person и user).
      */
     public function destroy(int $id): JsonResponse
     {
         $client = Client::with('person.user')->findOrFail($id);
-
-        // Удаляем user — каскадно удалит person → client
         $client->person->user->delete();
 
-        return response()->json([
-            'message' => 'Клиент удалён',
-        ]);
+        return response()->json(['message' => 'Клиент удалён']);
     }
 
     /**
@@ -188,17 +184,28 @@ class ClientController extends Controller
     private function formatClient(Client $client): array
     {
         $activeMembership = $client->getActiveMembership();
+        $person = $client->person;
 
         return [
             'id'                => $client->person_id,
-            'full_name'         => $client->person->full_name,
-            'email'             => $client->person->user->email,
-            'phone'             => $client->person->phone,
-            'birth_date'        => $client->person->birth_date?->toDateString(),
+            'full_name'         => $person->full_name,
+            'email'             => $person->user->email,
+            'phone'             => $person->phone,
+            'birth_date'        => $person->birth_date?->toDateString(),
             'registration_date' => $client->registration_date->toDateString(),
             'status'            => $client->status,
             'remaining_visits'  => $client->getRemainingVisits(),
-            'membership'        => $activeMembership ? [
+
+            // Паспортные данные
+            'passport_series'           => $person->passport_series,
+            'passport_number'           => $person->passport_number,
+            'passport_issued_at'        => $person->passport_issued_at?->toDateString(),
+            'passport_issued_by'        => $person->passport_issued_by,
+            'passport_department_code'  => $person->passport_department_code,
+            'registration_address'      => $person->registration_address,
+            'has_passport'              => $person->hasPassport(),
+
+            'membership' => $activeMembership ? [
                 'id'               => $activeMembership->id,
                 'type'             => $activeMembership->membershipType->name,
                 'status'           => $activeMembership->status,

@@ -13,32 +13,40 @@ class ClientRequest extends FormRequest
 
     public function rules(): array
     {
-        $clientId = $this->route('id');
+        // Базовые правила для паспортных данных (необязательные)
+        $passportRules = [
+            'passport_series'           => 'nullable|string|regex:/^\d{4}$/',
+            'passport_number'           => 'nullable|string|regex:/^\d{6}$/',
+            'passport_issued_at'        => 'nullable|date|before_or_equal:today',
+            'passport_issued_by'        => 'nullable|string|max:255',
+            'passport_department_code'  => 'nullable|string|regex:/^\d{3}-\d{3}$/',
+            'registration_address'      => 'nullable|string|max:255',
+        ];
+
+        // Телефон в формате +7-nnn-nnn-nnnn
+        $phoneRule = 'nullable|string|regex:/^\+7-\d{3}-\d{3}-\d{4}$/';
 
         // При обновлении — все поля необязательны
         if ($this->isMethod('put') || $this->isMethod('patch')) {
-            return [
+            return array_merge([
                 'full_name'  => 'sometimes|string|max:150',
                 'email'      => 'sometimes|email|unique:users,email,' . $this->getEmailOwnerId(),
-                'phone'      => 'nullable|string|max:20',
+                'phone'      => $phoneRule,
                 'birth_date' => 'nullable|date|before:today',
                 'status'     => 'sometimes|in:active,inactive,blocked',
-            ];
+            ], $passportRules);
         }
 
         // При создании — email и ФИО обязательны
-        return [
+        return array_merge([
             'full_name'  => 'required|string|max:150',
             'email'      => 'required|email|unique:users,email',
             'password'   => 'nullable|string|min:6',
-            'phone'      => 'nullable|string|max:20',
+            'phone'      => $phoneRule,
             'birth_date' => 'nullable|date|before:today',
-        ];
+        ], $passportRules);
     }
 
-    /**
-     * Получить ID пользователя для проверки уникальности email при обновлении.
-     */
     private function getEmailOwnerId(): ?int
     {
         $clientId = $this->route('id');
@@ -51,10 +59,16 @@ class ClientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'full_name.required' => 'Укажите ФИО',
-            'email.required'     => 'Укажите email',
-            'email.unique'       => 'Этот email уже используется',
-            'status.in'          => 'Статус должен быть: active, inactive или blocked',
+            'full_name.required'                 => 'Укажите ФИО',
+            'email.required'                     => 'Укажите email',
+            'email.unique'                       => 'Этот email уже используется',
+            'phone.regex'                        => 'Телефон должен быть в формате +7-nnn-nnn-nnnn',
+            'passport_series.regex'              => 'Серия паспорта — ровно 4 цифры',
+            'passport_number.regex'              => 'Номер паспорта — ровно 6 цифр',
+            'passport_department_code.regex'    => 'Код подразделения — формат nnn-nnn',
+            'passport_issued_at.before_or_equal' => 'Дата выдачи паспорта не может быть в будущем',
+            'passport_issued_by.max'             => 'Слишком длинное значение поля "Кем выдан"',
+            'status.in'                          => 'Статус должен быть: active, inactive или blocked',
         ];
     }
 }

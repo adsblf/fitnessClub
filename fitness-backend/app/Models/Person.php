@@ -6,13 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 
 /**
- * Модель Person (человек) — профиль пользователя с ФИО и контактами.
- *
- * Связи:
- * - user()          → belongs-to User
- * - client()        → has-one Client
- * - trainer()       → has-one Trainer
- * - administrator() → has-one Administrator
+ * Модель Person (человек) — профиль пользователя с ФИО, контактами
+ * и паспортными данными.
  */
 class Person extends Model
 {
@@ -23,12 +18,19 @@ class Person extends Model
         'full_name',
         'phone',
         'birth_date',
+        'passport_series',
+        'passport_number',
+        'passport_issued_at',
+        'passport_issued_by',
+        'passport_department_code',
+        'registration_address',
     ];
 
     protected function casts(): array
     {
         return [
             'birth_date' => 'date',
+            'passport_issued_at' => 'date',
         ];
     }
 
@@ -59,5 +61,18 @@ class Person extends Model
     public function getAge(): ?int
     {
         return $this->birth_date ? $this->birth_date->age : null;
+    }
+
+    /**
+     * Полностью ли заполнены паспортные данные.
+     * Используется для решения, может ли клиент оформить полный абонемент.
+     */
+    public function hasPassport(): bool
+    {
+        return !empty($this->passport_series)
+            && !empty($this->passport_number)
+            && !empty($this->passport_issued_at)
+            && !empty($this->passport_issued_by)
+            && !empty($this->passport_department_code);
     }
 }

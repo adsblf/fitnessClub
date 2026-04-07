@@ -33,6 +33,11 @@ class ScheduleController extends Controller
             $query->where('trainer_id', $trainerId);
         }
 
+        // Фильтр по залу
+        if ($hallId = $request->query('hall_id')) {
+            $query->where('hall_id', $hallId);
+        }
+
         // Фильтр по типу (group / personal)
         if ($type = $request->query('type')) {
             $query->where('type', $type);
@@ -46,10 +51,21 @@ class ScheduleController extends Controller
         // Если дата не указана — показываем ближайшие 7 дней
         if (!$request->query('date')) {
             $query->whereDate('starts_at', '>=', now()->toDateString())
-                  ->whereDate('starts_at', '<=', now()->addDays(7)->toDateString());
+                ->whereDate('starts_at', '<=', now()->addDays(7)->toDateString());
         }
 
         $sessions = $query->get();
+
+        // Сортировка по свободным местам (только для групповых)
+        $sortSlots = $request->query('sort_slots'); // 'asc' | 'desc'
+        if ($sortSlots === 'asc' || $sortSlots === 'desc') {
+            $sessions = $sessions->sortBy(function ($s) {
+                if ($s->type !== 'group' || !$s->groupSession) {
+                    return PHP_INT_MAX; // непосредственно групповые в конец
+                }
+                return $s->groupSession->getAvailableSlots();
+            }, SORT_REGULAR, $sortSlots === 'desc')->values();
+        }
 
         return response()->json([
             'data' => $sessions->map(fn ($s) => $this->formatSession($s)),
@@ -98,7 +114,7 @@ class ScheduleController extends Controller
                 ->where('status', '!=', 'cancelled')
                 ->where(function ($q) use ($data) {
                     $q->where('starts_at', '<', $data['ends_at'])
-                      ->where('ends_at', '>', $data['starts_at']);
+                        ->where('ends_at', '>', $data['starts_at']);
                 })->exists();
 
             if ($conflict) {
@@ -114,7 +130,7 @@ class ScheduleController extends Controller
                 ->where('status', '!=', 'cancelled')
                 ->where(function ($q) use ($data) {
                     $q->where('starts_at', '<', $data['ends_at'])
-                      ->where('ends_at', '>', $data['starts_at']);
+                        ->where('ends_at', '>', $data['starts_at']);
                 })->exists();
 
             if ($trainerConflict) {
