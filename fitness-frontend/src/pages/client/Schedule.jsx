@@ -28,6 +28,10 @@ function ClassCard({ session, onBook }) {
       ? Math.round((session.registered / session.max_participants) * 100)
       : 0;
 
+  // Проверяем статус записи клиента
+  const isBooked = session.client_booking && session.client_booking.status;
+  const isCancelled = session.status === "cancelled";
+
   return (
       <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-3 hover:shadow-sm transition-shadow">
         <div className="flex justify-between items-start gap-2">
@@ -68,17 +72,35 @@ function ClassCard({ session, onBook }) {
             </div>
         )}
 
-        {isGroup && (
-            <button
-                disabled={isFull}
-                onClick={() => onBook(session)}
-                className={`mt-auto pt-1 text-sm font-medium transition-opacity ${
-                    isFull ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed" : "text-zinc-900 dark:text-zinc-100 hover:opacity-60"
-                }`}
-            >
-              {isFull ? "Нет мест" : "Записаться →"}
-            </button>
-        )}
+        {/* Статус записи / кнопка */}
+        <div className="mt-auto pt-1">
+          {isCancelled ? (
+              <div className="text-sm text-red-600 dark:text-red-400 font-medium">
+                ⚠️ Тренировка отменена
+              </div>
+          ) : isBooked ? (
+              <div className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                ✓ Вы уже записаны
+              </div>
+          ) : isGroup ? (
+              <button
+                  disabled={isFull}
+                  onClick={() => onBook(session)}
+                  className={`w-full text-sm font-medium transition-opacity py-1 ${
+                      isFull ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed" : "text-zinc-900 dark:text-zinc-100 hover:opacity-60"
+                  }`}
+              >
+                {isFull ? "Нет мест" : "Записаться →"}
+              </button>
+          ) : (
+              <button
+                  onClick={() => onBook(session)}
+                  className="w-full text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:opacity-60 transition-opacity py-1"
+              >
+                Записаться →
+              </button>
+          )}
+        </div>
       </div>
   );
 }

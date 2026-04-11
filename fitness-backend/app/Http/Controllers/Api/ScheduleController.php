@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SessionRequest;
+use App\Models\Booking;
+use App\Models\Client;
 use App\Models\GroupSession;
 use App\Models\Hall;
 use App\Models\PersonalSession;
@@ -308,6 +310,22 @@ class ScheduleController extends Controller
                 'full_name' => $ps->client->person->full_name ?? null,
             ];
         }
+
+        // Проверяем, записан ли текущий пользователь (если это клиент)
+        $clientBooking = null;
+        if (auth()->check() && auth()->user()->roles()->where('name', 'client')->exists()) {
+            $client = Client::where('person_id', auth()->user()->id)->first();
+            if ($client) {
+                $clientBooking = Booking::where('client_id', $client->person_id)
+                    ->where('session_id', $session->id)
+                    ->whereIn('status', ['pending', 'confirmed'])
+                    ->first();
+            }
+        }
+        $data['client_booking'] = $clientBooking ? [
+            'id' => $clientBooking->id,
+            'status' => $clientBooking->status,
+        ] : null;
 
         return $data;
     }
