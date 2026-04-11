@@ -5,8 +5,9 @@ import { clientsApi } from "../../api/clients";
 import { bookingsApi } from "../../api/bookings";
 
 const BOOKING_STATUS_MAP = {
-  pending:    { label: "На рассмотрении", cls: "bg-amber-100 text-amber-700", icon: "⏳" },
+  pending:    { label: "Ожидает подтверждения администратором", cls: "bg-amber-100 text-amber-700", icon: "⏳" },
   confirmed:  { label: "Подтверждено",    cls: "bg-emerald-100 text-emerald-700", icon: "✓" },
+  rejected:   { label: "Отклонена администратором", cls: "bg-red-100 text-red-600", icon: "✕" },
   cancelled:  { label: "Отменено",        cls: "bg-zinc-100 text-zinc-500", icon: "✕" },
   completed:  { label: "Завершено",       cls: "bg-blue-100 text-blue-700", icon: "✓" },
 };
@@ -73,10 +74,10 @@ export default function ClientDashboard() {
   const m = profile.membership;
   const firstName = profile.full_name?.split(" ")[0] ?? "";
 
-  // Фильтруем ближайшие активные записи (только confirmed, не позже чем через 30 дней)
+  // Фильтруем ближайшие записи (confirmed, pending, rejected, но не позже чем через 30 дней)
   const now = new Date();
   const upcomingBookings = bookings
-    .filter(b => b.status === "confirmed")
+    .filter(b => ['confirmed', 'pending', 'rejected'].includes(b.status))
     .filter(b => new Date(b.datetime_start) > now)
     .sort((a, b) => new Date(a.datetime_start) - new Date(b.datetime_start))
     .slice(0, 5);
@@ -183,7 +184,7 @@ export default function ClientDashboard() {
           <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
             <div>
               <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Ближайшие тренировки</div>
-              <p className="text-xs text-zinc-400 mt-0.5">Ваши подтверждённые записи</p>
+              <p className="text-xs text-zinc-400 mt-0.5">Ваши записи (подтверждённые, ожидающие подтверждения и отклонённые)</p>
             </div>
             <button
                 onClick={() => navigate("/client/schedule")}

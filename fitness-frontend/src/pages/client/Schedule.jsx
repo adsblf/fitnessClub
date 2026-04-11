@@ -9,6 +9,12 @@ const LEVEL_COLOR = {
   "Продвинутый": "bg-red-100 text-red-600",
 };
 
+const BOOKING_STATUS_MAP = {
+  pending:   { label: "Ожидает подтверждения", cls: "bg-amber-100 text-amber-700", icon: "⏳" },
+  confirmed: { label: "Записан", cls: "bg-emerald-100 text-emerald-700", icon: "✓" },
+  rejected:  { label: "Отклонена", cls: "bg-red-100 text-red-600", icon: "✕" },
+};
+
 function dayTabs(n = 7) {
   const days = [];
   const now = new Date();
@@ -29,7 +35,7 @@ function ClassCard({ session, onBook }) {
       : 0;
 
   // Проверяем статус записи клиента
-  const isBooked = session.client_booking && session.client_booking.status;
+  const bookingStatus = session.client_booking ? session.client_booking.status : null;
   const isCancelled = session.status === "cancelled";
 
   return (
@@ -78,9 +84,9 @@ function ClassCard({ session, onBook }) {
               <div className="text-sm text-red-600 dark:text-red-400 font-medium">
                 ⚠️ Тренировка отменена
               </div>
-          ) : isBooked ? (
-              <div className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                ✓ Вы уже записаны
+          ) : bookingStatus ? (
+              <div className={`text-sm font-medium inline-flex px-2.5 py-1 rounded-lg text-xs ${BOOKING_STATUS_MAP[bookingStatus]?.cls ?? "bg-zinc-100 text-zinc-600"}`}>
+                {BOOKING_STATUS_MAP[bookingStatus]?.icon} {BOOKING_STATUS_MAP[bookingStatus]?.label}
               </div>
           ) : isGroup ? (
               <button
