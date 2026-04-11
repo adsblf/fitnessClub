@@ -238,7 +238,7 @@ class BookingController extends Controller
     private function formatClientBooking(Booking $b): array
     {
         $session = $b->session;
-        return [
+        $data = [
             'id'               => $b->id,
             'session_id'       => $b->session_id,
             'status'           => $b->status,
@@ -255,5 +255,13 @@ class BookingController extends Controller
             'type'             => $session->isGroup() ? 'group' : 'personal',
             'created_at'       => $b->created_at->toDateTimeString(),
         ];
+
+        // Добавляем информацию о местах для групповых занятий
+        if ($session->isGroup() && $session->groupSession) {
+            $data['max_participants'] = $session->groupSession->max_participants;
+            $data['registered'] = $session->groupSession->getRegisteredCount();
+        }
+
+        return $data;
     }
 }

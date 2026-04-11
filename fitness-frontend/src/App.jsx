@@ -24,6 +24,7 @@ import AdminPendingBookings from "./pages/admin/AdminPendingBookings";
 import ClientDashboard from "./pages/client/ClientDashboard";
 import Schedule from "./pages/client/Schedule";
 import BookingConfirm from "./pages/client/BookingConfirm";
+import Bookings from "./pages/client/Bookings";
 
 // Trainer pages
 import TrainerSchedule from "./pages/trainer/TrainerSchedule";
@@ -97,7 +98,7 @@ export default function App() {
                             <Route index element={<ClientDashboard />} />
                             <Route path="schedule" element={<Schedule />} />
                             <Route path="schedule/book/:id" element={<BookingConfirm />} />
-                            <Route path="bookings" element={<Stub title="Мои записи" />} />
+                            <Route path="bookings" element={<Bookings />} />
                             <Route path="profile" element={<Stub title="Профиль" />} />
                         </Route>
                     </Route>
