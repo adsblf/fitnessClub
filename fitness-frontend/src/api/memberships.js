@@ -10,6 +10,9 @@ export const membershipsApi = {
     create(data) {
         return api.post("/memberships", data);
     },
+    calculatePrice(data) {
+        return api.post("/memberships/calculate-price", data);
+    },
     freeze(id, days = 14) {
         return api.post(`/memberships/${id}/freeze`, { days });
     },

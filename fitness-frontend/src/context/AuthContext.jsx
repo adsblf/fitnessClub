@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+/* eslint-disable react-refresh/only-export-components, react-hooks/set-state-in-effect */
+import { useState, useEffect, useCallback } from "react";
 import { authApi } from "../api/auth";
-
-const AuthContext = createContext(null);
+import { AuthContext } from "./core";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 0);
       return;
     }
     authApi
@@ -33,8 +33,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ── Login ─────────────────────────────────────────
-  const login = useCallback(async (email, password) => {
-    const res = await authApi.login({ email, password });
+  const login = useCallback(async (login, password) => {
+    const res = await authApi.login({ login, password });
     const { token, user: u } = res.data;
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(u));
@@ -84,8 +84,4 @@ export function AuthProvider({ children }) {
   );
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be inside AuthProvider");
-  return ctx;
-}
+// useAuth вынесен в src/context/useAuth.js для совместимости с fast-refresh

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ login: "", password: "" });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -15,7 +15,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      const user = await login(form.email, form.password);
+      const user = await login(form.login, form.password);
       const role = user.roles?.[0];
       if (role === "admin" || role === "owner") navigate("/admin", { replace: true });
       else if (role === "trainer") navigate("/trainer", { replace: true });
@@ -48,14 +48,14 @@ export default function Login() {
           )}
 
           <div>
-            <label className="block text-xs text-zinc-500 mb-1.5">Email</label>
+            <label className="block text-xs text-zinc-500 mb-1.5">Логин</label>
             <input
-              type="email"
+              type="text"
               required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              value={form.login}
+              onChange={(e) => setForm({ ...form, login: e.target.value })}
               className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-colors"
-              placeholder="admin@fitclub.ru"
+              placeholder="admin"
             />
           </div>
 
@@ -88,7 +88,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-xs text-zinc-400 mt-4">
-          Демо: admin@fitclub.ru / password
+          Демо: admin / password
         </p>
       </div>
     </div>

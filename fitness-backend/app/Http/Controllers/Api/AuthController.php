@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -23,9 +24,13 @@ class AuthController extends Controller
     {
         $data = $request->validated();
 
+        // если логин не передан — сгенерируем
+        $login = $data['login'] ?? ('user.' . Str::random(8));
+
         // 1. Создаём пользователя
         $user = User::create([
             'email'    => $data['email'],
+            'login'    => $login,
             'password' => Hash::make($data['password']),
         ]);
 
@@ -66,11 +71,15 @@ class AuthController extends Controller
     {
         $data = $request->validated();
 
-        $user = User::where('email', $data['email'])->first();
+        // Поддерживаем вход по логину или по email (для существующих демо-аккаунтов)
+        $identity = $data['login'];
+        $user = User::where('login', $identity)
+                    ->orWhere('email', $identity)
+                    ->first();
 
         if (!$user || !Hash::check($data['password'], $user->password)) {
             return response()->json([
-                'message' => 'Неверный email или пароль',
+                'message' => 'Неверный логин/email или пароль',
             ], 401);
         }
 
@@ -120,6 +129,7 @@ class AuthController extends Controller
         $result = [
             'id'    => $user->id,
             'email' => $user->email,
+            'login' => $user->login,
             'roles' => $user->roles->pluck('name'),
         ];
 

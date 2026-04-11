@@ -23,6 +23,13 @@ Route::prefix('v1')->group(function () {
         Route::post('login',    [AuthController::class, 'login']);
     });
 
+    // ── ПУБЛИЧНЫЕ маршруты для эмулятора эквайринга ────
+    // Эмулятор открывается в отдельной вкладке и не имеет токена админа.
+    // Поэтому статус платежа и webhook доступны без auth. В продакшне
+    // webhook защищался бы подписью от платёжного шлюза.
+    Route::get('payments/{id}/status', [MembershipController::class, 'paymentStatus']);
+    Route::post('payments/{id}/webhook', [MembershipController::class, 'paymentWebhook']);
+
     // ── Защищённые маршруты ────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {
 
@@ -51,12 +58,16 @@ Route::prefix('v1')->group(function () {
             // Посещения клиента
             Route::get('/{id}/visits', [VisitController::class, 'clientVisits'])
                 ->middleware('role:admin,owner,trainer');
+
+            // Учётные данные клиента (только админ)
+            Route::get('/{id}/credentials', [MembershipController::class, 'clientCredentials'])
+                ->middleware('role:admin');
         });
 
         // Расписание
         Route::prefix('schedule')->group(function () {
-            Route::get('/',     [ScheduleController::class, 'index']);                                  // все авторизованные
-            Route::get('/{id}', [ScheduleController::class, 'show']);                                   // все авторизованные
+            Route::get('/',     [ScheduleController::class, 'index']);
+            Route::get('/{id}', [ScheduleController::class, 'show']);
             Route::post('/',    [ScheduleController::class, 'store'])->middleware('role:admin');
             Route::put('/{id}', [ScheduleController::class, 'update'])->middleware('role:admin');
             Route::post('/{id}/cancel', [ScheduleController::class, 'cancel'])->middleware('role:admin');
@@ -71,15 +82,17 @@ Route::prefix('v1')->group(function () {
 
         // Абонементы — управление
         Route::prefix('memberships')->middleware('role:admin')->group(function () {
-            Route::get('/',             [MembershipController::class, 'index']);
-            Route::post('/',            [MembershipController::class, 'store']);
-            Route::post('/{id}/freeze', [MembershipController::class, 'freeze']);
-            Route::post('/{id}/unfreeze', [MembershipController::class, 'unfreeze']);
+            Route::get('/',                 [MembershipController::class, 'index']);
+            Route::post('/',                [MembershipController::class, 'store']);
+            Route::post('/calculate-price', [MembershipController::class, 'calculatePrice']);
+            Route::post('/{id}/freeze',     [MembershipController::class, 'freeze']);
+            Route::post('/{id}/unfreeze',   [MembershipController::class, 'unfreeze']);
+            Route::post('/{id}/cancel',     [MembershipController::class, 'cancel']);
         });
 
         // Записи на занятия
         Route::prefix('bookings')->group(function () {
-            Route::post('/',      [BookingController::class, 'store'])->middleware('role:admin,client');
+            Route::post('/',       [BookingController::class, 'store'])->middleware('role:admin,client');
             Route::delete('/{id}', [BookingController::class, 'destroy'])->middleware('role:admin,client');
         });
 

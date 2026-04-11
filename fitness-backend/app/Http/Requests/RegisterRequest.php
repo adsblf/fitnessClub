@@ -14,6 +14,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'login'      => 'nullable|string|unique:users,login',
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|string|min:6',
             'full_name'  => 'required|string|max:150',
@@ -30,6 +31,7 @@ class RegisterRequest extends FormRequest
             'password.required' => 'Укажите пароль',
             'password.min'      => 'Пароль должен быть не менее 6 символов',
             'full_name.required' => 'Укажите ФИО',
+            'login.unique'      => 'Этот логин уже используется',
         ];
     }
 }

@@ -14,7 +14,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email'    => 'required|email',
+            'login'    => 'required|string',
             'password' => 'required|string',
         ];
     }
@@ -22,8 +22,8 @@ class LoginRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.required'    => 'Укажите email',
-            'email.email'       => 'Некорректный формат email',
+            'login.required'    => 'Укажите логин',
+            'login.string'      => 'Некорректный формат логина',
             'password.required' => 'Укажите пароль',
         ];
     }

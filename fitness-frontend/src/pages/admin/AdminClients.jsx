@@ -153,6 +153,7 @@ export default function AdminClients() {
 function CreateClientModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     full_name: "",
+    login: "",
     email: "",
     phone: "",
     birth_date: "",
@@ -176,10 +177,30 @@ function CreateClientModal({ onClose, onCreated }) {
     const e = {};
 
     if (!form.full_name.trim()) e.full_name = "Укажите ФИО";
-    if (!form.email.trim()) e.email = "Укажите email";
+    // Email обязателен и должен быть корректным
+    if (!form.email || !form.email.trim()) {
+      e.email = "Укажите email";
+    } else {
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!EMAIL_REGEX.test(form.email)) e.email = "Неверный формат email";
+    }
+    // Login — опционально, но не должен содержать пробелы
+    if (form.login && /\s/.test(form.login)) {
+      e.login = "Логин не должен содержать пробелов";
+    }
 
-    if (form.phone && !PHONE_REGEX.test(form.phone)) {
+    // Телефон — обязателен и должен соответствовать формату
+    if (!form.phone || !form.phone.trim()) {
+      e.phone = "Укажите телефон";
+    } else if (!PHONE_REGEX.test(form.phone)) {
       e.phone = "Формат: +7-nnn-nnn-nnnn";
+    }
+
+    // Дата рождения — обязательна и не в будущем
+    if (!form.birth_date) {
+      e.birth_date = "Укажите дату рождения";
+    } else if (form.birth_date > new Date().toISOString().split("T")[0]) {
+      e.birth_date = "Дата не может быть в будущем";
     }
 
     // Паспорт — все поля либо пустые, либо валидные.
@@ -249,13 +270,16 @@ function CreateClientModal({ onClose, onCreated }) {
                 <input className="input" required value={form.full_name} onChange={(e) => set("full_name")(e.target.value)} placeholder="Иванов Иван Иванович" />
               </Field>
               <Field label="Email *" error={errors.email}>
-                <input type="email" className="input" required value={form.email} onChange={(e) => set("email")(e.target.value)} placeholder="ivan@example.ru" />
+                <input type="email" required className="input" value={form.email} onChange={(e) => set("email")(e.target.value)} placeholder="ivan@example.ru" />
               </Field>
-              <Field label="Телефон" error={errors.phone} hint="+7-nnn-nnn-nnnn">
-                <input className="input" value={form.phone} onChange={(e) => set("phone")(e.target.value)} placeholder="+7-900-123-45-67" />
+              <Field label="Логин" error={errors.login}>
+                <input type="text" className="input" value={form.login} onChange={(e) => set("login")(e.target.value)} placeholder="client123" />
               </Field>
-              <Field label="Дата рождения" error={errors.birth_date}>
-                <input type="date" className="input" value={form.birth_date} onChange={(e) => set("birth_date")(e.target.value)} />
+              <Field label="Телефон *" error={errors.phone} hint="+7-nnn-nnn-nnnn">
+                <input className="input" required value={form.phone} onChange={(e) => set("phone")(e.target.value)} placeholder="+7-900-123-45-67" />
+              </Field>
+              <Field label="Дата рождения *" error={errors.birth_date}>
+                <input type="date" className="input" required value={form.birth_date} onChange={(e) => set("birth_date")(e.target.value)} />
               </Field>
             </div>
 

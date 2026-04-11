@@ -24,6 +24,7 @@ class Person extends Model
         'passport_issued_by',
         'passport_department_code',
         'registration_address',
+        'plain_password',
     ];
 
     protected function casts(): array
@@ -65,7 +66,6 @@ class Person extends Model
 
     /**
      * Полностью ли заполнены паспортные данные.
-     * Используется для решения, может ли клиент оформить полный абонемент.
      */
     public function hasPassport(): bool
     {

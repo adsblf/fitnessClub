@@ -22,4 +22,7 @@ export const clientsApi = {
     visits(id) {
         return api.get(`/clients/${id}/visits`);
     },
+    credentials(id) {
+        return api.get(`/clients/${id}/credentials`);
+    },
 };

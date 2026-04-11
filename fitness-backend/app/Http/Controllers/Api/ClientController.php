@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class ClientController extends Controller
 {
@@ -56,9 +57,15 @@ class ClientController extends Controller
     {
         $data = $request->validated();
 
+        // Если логин не передан — сгенерируем уникальный логин
+        $login = $data['login'] ?? ('client.' . Str::random(8));
+        $email = $data['email'] ?? null;
+        $password = $data['password'] ?? 'password';
+
         $user = User::create([
-            'email'    => $data['email'],
-            'password' => Hash::make($data['password'] ?? 'password'),
+            'login'    => $login,
+            'email'    => $email,
+            'password' => Hash::make($password),
         ]);
 
         $clientRole = Role::where('name', 'client')->first();
@@ -152,7 +159,13 @@ class ClientController extends Controller
         }
 
         if (array_key_exists('email', $data)) {
-            $client->person->user->update(['email' => $data['email']]);
+            // Обновляем email через forceFill, чтобы избежать проблем с guarded/fillable
+            $client->person->user->forceFill(['email' => $data['email']])->save();
+        }
+
+        if (array_key_exists('login', $data)) {
+            // Обновляем логин через forceFill
+            $client->person->user->forceFill(['login' => $data['login']])->save();
         }
 
         if (array_key_exists('status', $data)) {

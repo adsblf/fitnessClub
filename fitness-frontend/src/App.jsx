@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import { RequireAuth, RequireRole, GuestOnly } from "./components/guards";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
+import { RequireRole, GuestOnly } from "./components/guards";
 
 // Layouts
 import AdminLayout from "./components/layout/AdminLayout";
@@ -25,6 +26,9 @@ import BookingConfirm from "./pages/client/BookingConfirm";
 
 // Trainer pages
 import TrainerSchedule from "./pages/trainer/TrainerSchedule";
+
+// Payment emulator (public)
+import PaymentEmulator from "./pages/payment/PaymentEmulator";
 
 function Stub({ title }) {
     return (
@@ -63,6 +67,10 @@ export default function App() {
                 <Routes>
                     {/* Корень — редирект по роли */}
                     <Route path="/" element={<RootRedirect />} />
+
+                    {/* ── Публичный эмулятор эквайринга ── */}
+                    {/* Открывается в отдельной вкладке, не требует авторизации */}
+                    <Route path="/payment/:id" element={<PaymentEmulator />} />
 
                     {/* ── Гостевые маршруты (только не-авторизованные) ── */}
                     <Route element={<GuestOnly />}>
