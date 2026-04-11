@@ -10,4 +10,13 @@ export const bookingsApi = {
     sessionBookings(sessionId) {
         return api.get(`/sessions/${sessionId}/bookings`);
     },
+    getPending() {
+        return api.get("/bookings/pending");
+    },
+    approve(id) {
+        return api.post(`/bookings/${id}/approve`);
+    },
+    reject(id) {
+        return api.post(`/bookings/${id}/reject`);
+    },
 };

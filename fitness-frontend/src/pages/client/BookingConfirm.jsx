@@ -64,14 +64,14 @@ export default function BookingConfirm() {
     if (status === "success") {
         return (
             <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl mb-4">
-                    ✓
+                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center text-3xl mb-4">
+                    ⏳
                 </div>
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
-                    Запись подтверждена!
+                    Запись отправлена на подтверждение
                 </h2>
                 <p className="text-sm text-zinc-400 mb-2">
-                    Вы записаны на{" "}
+                    Администратор проверит вашу запись на{" "}
                     <strong className="text-zinc-700 dark:text-zinc-300">
                         {session.name ?? "Персональную тренировку"}
                     </strong>

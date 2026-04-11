@@ -15,11 +15,13 @@ class BookingController extends Controller
      * POST /api/v1/bookings
      * Записать клиента на занятие.
      *
-     * Проверки по диаграмме последовательности:
+     * Запись создаётся со статусом "pending" (ожидает подтверждения администратором).
+     * Место на занятии не резервируется до подтверждения админом.
+     *
+     * Проверки:
      * 1. Занятие существует и ЗАПЛАНИРОВАНО
-     * 2. Есть свободные места (для групповых)
-     * 3. У клиента есть активный абонемент
-     * 4. Клиент ещё не записан на это занятие
+     * 3. У клиента есть активный абонемент с оставшимися посещениями
+     * 4. Клиент ещё не записан на это занятие (pending или confirmed)
      */
     public function store(BookingRequest $request): JsonResponse
     {
@@ -33,15 +35,6 @@ class BookingController extends Controller
             return response()->json([
                 'message' => 'Занятие отменено или уже завершено',
             ], 409);
-        }
-
-        // Проверка 2: свободные места (только для групповых)
-        if ($session->isGroup() && $session->groupSession) {
-            if ($session->groupSession->isFull()) {
-                return response()->json([
-                    'message' => 'Все места заняты (свободных: 0)',
-                ], 409);
-            }
         }
 
         // Проверка 3: активный абонемент
@@ -58,10 +51,10 @@ class BookingController extends Controller
             ], 409);
         }
 
-        // Проверка 4: не записан ли уже
+        // Проверка 4: не записан ли уже (pending или confirmed)
         $alreadyBooked = Booking::where('client_id', $client->person_id)
             ->where('session_id', $session->id)
-            ->whereIn('status', ['booked', 'confirmed'])
+            ->whereIn('status', ['pending', 'confirmed'])
             ->exists();
 
         if ($alreadyBooked) {
@@ -70,17 +63,17 @@ class BookingController extends Controller
             ], 409);
         }
 
-        // Создаём запись
+        // Создаём запись со статусом "pending"
         $booking = Booking::create([
             'client_id'  => $client->person_id,
             'session_id' => $session->id,
-            'status'     => 'booked',
+            'status'     => 'pending',
         ]);
 
         $booking->load(['client.person', 'session.groupSession']);
 
         return response()->json([
-            'message' => 'Запись на занятие создана',
+            'message' => 'Запись создана и отправлена на подтверждение администратору',
             'data'    => $this->formatBooking($booking),
         ], 201);
     }
@@ -103,6 +96,97 @@ class BookingController extends Controller
 
         return response()->json([
             'message' => 'Запись отменена',
+        ]);
+    }
+
+    /**
+     * POST /api/v1/bookings/{id}/approve
+     * Подтвердить запись (администратор).
+     *
+     * Проверки:
+     * 1. Запись существует и в статусе "pending"
+     * 2. Для групповых занятий: есть свободные места
+     * 3. Клиент всё ещё имеет активный абонемент
+     */
+    public function approve(int $id): JsonResponse
+    {
+        $booking = Booking::with(['client', 'session.groupSession'])->findOrFail($id);
+
+        // Проверка 1: статус pending
+        if (!$booking->isPending()) {
+            return response()->json([
+                'message' => 'Запись не в статусе "ожидает подтверждения"',
+            ], 409);
+        }
+
+        $session = $booking->session;
+        $client = $booking->client;
+
+        // Проверка 2: свободные места (только для групповых)
+        if ($session->isGroup() && $session->groupSession) {
+            if ($session->groupSession->isFull()) {
+                return response()->json([
+                    'message' => 'Все места на занятии заняты. Невозможно подтвердить запись.',
+                ], 409);
+            }
+        }
+
+        // Проверка 3: активный абонемент клиента
+        $membership = $client->getActiveMembership();
+        if (!$membership || $membership->remaining_visits <= 0) {
+            return response()->json([
+                'message' => 'У клиента больше нет активного абонемента или закончились посещения',
+            ], 409);
+        }
+
+        // Подтверждаем запись (администратор_id установится автоматически через auth)
+        $administratorId = auth()->user()->person()->first()?->id ?? auth()->id();
+        if (!$administratorId) {
+            return response()->json([
+                'message' => 'Ошибка: не удалось определить администратора',
+            ], 500);
+        }
+        $booking->approve($administratorId);
+
+        $booking->load(['client.person', 'session.groupSession']);
+
+        return response()->json([
+            'message' => 'Запись подтверждена',
+            'data'    => $this->formatBooking($booking),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/bookings/{id}/reject
+     * Отклонить запись (администратор).
+     *
+     * Проверка: запись существует и в статусе "pending"
+     */
+    public function reject(int $id): JsonResponse
+    {
+        $booking = Booking::findOrFail($id);
+
+        // Проверка: статус pending
+        if (!$booking->isPending()) {
+            return response()->json([
+                'message' => 'Запись не в статусе "ожидает подтверждения"',
+            ], 409);
+        }
+
+        // Отклоняем запись (администратор_id установится автоматически через auth)
+        $administratorId = auth()->user()->person()->first()?->id ?? auth()->id();
+        if (!$administratorId) {
+            return response()->json([
+                'message' => 'Ошибка: не удалось определить администратора',
+            ], 500);
+        }
+        $booking->reject($administratorId);
+
+        $booking->load(['client.person', 'session.groupSession']);
+
+        return response()->json([
+            'message' => 'Запись отклонена',
+            'data'    => $this->formatBooking($booking),
         ]);
     }
 

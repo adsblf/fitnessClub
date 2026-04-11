@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { dashboardApi } from "../../api/dashboard";
 
 function fmt(n) {
   return Number(n).toLocaleString("ru-RU");
 }
 
-function StatCard({ label, value, sub, accent }) {
+function StatCard({ label, value, sub, accent, onClick }) {
   return (
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5">
+      <div
+          onClick={onClick}
+          className={`bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 ${
+              onClick ? "cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700 transition" : ""
+          }`}
+      >
         <div className="text-xs text-zinc-400 mb-1">{label}</div>
         <div className={`text-2xl font-semibold ${accent ?? "text-zinc-900 dark:text-zinc-100"}`}>
           {value}
@@ -18,6 +24,7 @@ function StatCard({ label, value, sub, accent }) {
 }
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -86,6 +93,13 @@ export default function AdminDashboard() {
           <StatCard
               label="Записей на сегодня"
               value={stats.bookings_today}
+          />
+          <StatCard
+              label="Ожидает подтверждения"
+              value={stats.pending_bookings_count}
+              accent={stats.pending_bookings_count > 0 ? "text-amber-600 dark:text-amber-500 font-bold" : ""}
+              sub={stats.pending_bookings_count > 0 ? "Нужно обработать" : "Все обработаны"}
+              onClick={() => navigate("/admin/pending-bookings")}
           />
         </div>
       </div>

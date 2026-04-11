@@ -43,6 +43,9 @@ Route::prefix('v1')->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index'])
             ->middleware('role:admin,owner');
 
+        Route::get('bookings/pending', [DashboardController::class, 'pendingBookings'])
+            ->middleware('role:admin');
+
         // Клиенты — CRUD
         Route::prefix('clients')->group(function () {
             Route::get('/',     [ClientController::class, 'index'])->middleware('role:admin,owner');
@@ -94,6 +97,8 @@ Route::prefix('v1')->group(function () {
         Route::prefix('bookings')->group(function () {
             Route::post('/',       [BookingController::class, 'store'])->middleware('role:admin,client');
             Route::delete('/{id}', [BookingController::class, 'destroy'])->middleware('role:admin,client');
+            Route::post('/{id}/approve', [BookingController::class, 'approve'])->middleware('role:admin');
+            Route::post('/{id}/reject',  [BookingController::class, 'reject'])->middleware('role:admin');
         });
 
         // Список записей на конкретное занятие

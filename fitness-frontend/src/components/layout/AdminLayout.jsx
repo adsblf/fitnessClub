@@ -7,6 +7,7 @@ const nav = [
   { to: "/admin/schedule",    label: "Расписание",   icon: "📅" },
   { to: "/admin/memberships", label: "Абонементы",   icon: "🎫" },
   { to: "/admin/visits",      label: "Посещения",    icon: "✅" },
+  { to: "/admin/pending-bookings", label: "Ожидающие записи", icon: "⏳" },
 ];
 
 export default function AdminLayout() {

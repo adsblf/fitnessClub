@@ -26,12 +26,12 @@ class GroupSession extends Model
     }
 
     /**
-     * Сколько мест занято (подтверждённые + забронированные записи).
+     * Сколько мест занято (только подтвёржённые записи).
      */
     public function getRegisteredCount(): int
     {
         return $this->session->bookings()
-            ->whereIn('status', ['booked', 'confirmed'])
+            ->where('status', 'confirmed')
             ->count();
     }
 
