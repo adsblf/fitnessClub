@@ -8,6 +8,7 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Session;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
@@ -206,6 +207,22 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/v1/clients/{clientId}/bookings
+     * Получить все записи клиента на занятия.
+     */
+    public function clientBookings(int $clientId): JsonResponse
+    {
+        $bookings = Booking::with(['session.groupSession', 'session.trainer', 'session.hall'])
+            ->where('client_id', $clientId)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json([
+            'data' => $bookings->map(fn ($b) => $this->formatClientBooking($b)),
+        ]);
+    }
+
     private function formatBooking(Booking $b): array
     {
         return [
@@ -215,6 +232,28 @@ class BookingController extends Controller
             'session_id'  => $b->session_id,
             'status'      => $b->status,
             'created_at'  => $b->created_at->toDateTimeString(),
+        ];
+    }
+
+    private function formatClientBooking(Booking $b): array
+    {
+        $session = $b->session;
+        return [
+            'id'               => $b->id,
+            'session_id'       => $b->session_id,
+            'status'           => $b->status,
+            'session_name'     => $session->groupSession?->name ?? 'Персональная тренировка',
+            'trainer_name'     => $session->trainer?->person?->full_name ?? 'Не назначен',
+            'hall'             => $session->hall ? ['id' => $session->hall->id, 'number' => $session->hall->number] : null,
+            'time_start'       => $session->starts_at->format('H:i'),
+            'time_end'         => $session->ends_at->format('H:i'),
+            'date'             => $session->starts_at->toDateString(),
+            'datetime_start'   => $session->starts_at->toDateTimeString(),
+            'datetime_end'     => $session->ends_at->toDateTimeString(),
+            'duration'         => $session->starts_at->diffInMinutes($session->ends_at),
+            'difficulty_level' => $session->groupSession?->difficulty_level ?? null,
+            'type'             => $session->isGroup() ? 'group' : 'personal',
+            'created_at'       => $b->created_at->toDateTimeString(),
         ];
     }
 }

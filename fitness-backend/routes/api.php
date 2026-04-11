@@ -50,17 +50,21 @@ Route::prefix('v1')->group(function () {
         Route::prefix('clients')->group(function () {
             Route::get('/',     [ClientController::class, 'index'])->middleware('role:admin,owner');
             Route::post('/',    [ClientController::class, 'store'])->middleware('role:admin');
-            Route::get('/{id}', [ClientController::class, 'show'])->middleware('role:admin,owner,trainer');
+            Route::get('/{id}', [ClientController::class, 'show'])->middleware('role:admin,owner,trainer,client');
             Route::put('/{id}', [ClientController::class, 'update'])->middleware('role:admin');
             Route::delete('/{id}', [ClientController::class, 'destroy'])->middleware('role:admin');
 
             // Абонементы клиента
             Route::get('/{id}/memberships', [MembershipController::class, 'clientMemberships'])
-                ->middleware('role:admin,owner,trainer');
+                ->middleware('role:admin,owner,trainer,client');
 
             // Посещения клиента
             Route::get('/{id}/visits', [VisitController::class, 'clientVisits'])
-                ->middleware('role:admin,owner,trainer');
+                ->middleware('role:admin,owner,trainer,client');
+
+            // Записи клиента на занятия
+            Route::get('/{id}/bookings', [BookingController::class, 'clientBookings'])
+                ->middleware('role:admin,owner,trainer,client');
 
             // Учётные данные клиента (только админ)
             Route::get('/{id}/credentials', [MembershipController::class, 'clientCredentials'])

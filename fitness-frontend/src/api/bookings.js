@@ -19,4 +19,7 @@ export const bookingsApi = {
     reject(id) {
         return api.post(`/bookings/${id}/reject`);
     },
+    getClientBookings(clientId, params = {}) {
+        return api.get(`/clients/${clientId}/bookings`, { params });
+    },
 };
