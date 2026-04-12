@@ -48,6 +48,7 @@ Route::prefix('v1')->group(function () {
 
         // Клиенты — CRUD
         Route::prefix('clients')->group(function () {
+            Route::get('/search', [ClientController::class, 'search'])->middleware('role:admin,trainer');
             Route::get('/',     [ClientController::class, 'index'])->middleware('role:admin,owner');
             Route::post('/',    [ClientController::class, 'store'])->middleware('role:admin');
             Route::get('/{id}', [ClientController::class, 'show'])->middleware('role:admin,owner,trainer,client');
@@ -111,6 +112,7 @@ Route::prefix('v1')->group(function () {
 
         // Посещения
         Route::prefix('visits')->group(function () {
+            Route::get('/sessions-with-visits', [VisitController::class, 'sessionsWithVisits'])->middleware('role:admin,trainer');
             Route::post('/', [VisitController::class, 'store'])->middleware('role:admin,trainer');
             Route::get('/',  [VisitController::class, 'index'])->middleware('role:admin,owner');
         });

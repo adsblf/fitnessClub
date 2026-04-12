@@ -16,6 +16,9 @@ export const clientsApi = {
     delete(id) {
         return api.delete(`/clients/${id}`);
     },
+    search(query, limit = 10) {
+        return api.get("/clients/search", { params: { q: query, limit } });
+    },
     memberships(id) {
         return api.get(`/clients/${id}/memberships`);
     },

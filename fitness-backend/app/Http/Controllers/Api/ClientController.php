@@ -192,6 +192,46 @@ class ClientController extends Controller
     }
 
     /**
+     * GET /api/v1/clients/search
+     * Поиск клиентов для autocomplete по ФИО.
+     * Query params: q (минимум 2 символа), limit (по умолчанию 10)
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $query = $request->query('q', '');
+        $limit = (int) $request->query('limit', 10);
+
+        if (strlen($query) < 2) {
+            return response()->json(['data' => []]);
+        }
+
+        $clients = Client::with(['person.user', 'memberships.membershipType'])
+            ->whereHas('person', function ($q) use ($query) {
+                $q->where('full_name', 'like', "%{$query}%");
+            })
+            ->where('status', 'active')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => $clients->map(function ($client) {
+                $activeMembership = $client->getActiveMembership();
+                return [
+                    'person_id' => $client->person_id,
+                    'full_name' => $client->person->full_name,
+                    'phone' => $client->person->phone,
+                    'status' => $client->status,
+                    'remaining_visits' => $client->getRemainingVisits(),
+                    'active_membership' => $activeMembership ? [
+                        'type' => $activeMembership->membershipType->name,
+                        'remaining_visits' => $activeMembership->remaining_visits,
+                    ] : null,
+                ];
+            })->toArray(),
+        ]);
+    }
+
+    /**
      * Форматирование клиента для JSON-ответа.
      */
     private function formatClient(Client $client): array

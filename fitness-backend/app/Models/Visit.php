@@ -19,6 +19,7 @@ class Visit extends Model
         'visited_at',
         'status',
         'notes',
+        'is_manual_entry',
     ];
 
     protected function casts(): array

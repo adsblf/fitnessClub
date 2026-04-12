@@ -7,4 +7,7 @@ export const visitsApi = {
     list(params = {}) {
         return api.get("/visits", { params });
     },
+    sessionsWithVisits(params = {}) {
+        return api.get("/visits/sessions-with-visits", { params });
+    },
 };

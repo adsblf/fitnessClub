@@ -78,4 +78,63 @@ class Session extends Model
     {
         return (int) $this->starts_at->diffInMinutes($this->ends_at);
     }
+
+    /**
+     * Можно ли редактировать посещения этого занятия.
+     * Редактировать можно только во время или после начала занятия.
+     */
+    public function isEditable(): bool
+    {
+        return now()->greaterThanOrEqualTo($this->starts_at);
+    }
+
+    /**
+     * Получить информацию об участниках (записи + посещения).
+     * Возвращает объединённый список с информацией о каждом участнике.
+     */
+    public function getParticipantsInfo()
+    {
+        $confirmedBookings = $this->bookings()
+            ->where('status', 'confirmed')
+            ->with(['client.person'])
+            ->get();
+
+        $visits = $this->visits()
+            ->with(['client.person'])
+            ->get();
+
+        $participants = [];
+
+        // Добавить записанных клиентов
+        foreach ($confirmedBookings as $booking) {
+            $clientId = $booking->client_id;
+            if (!isset($participants[$clientId])) {
+                $participants[$clientId] = [
+                    'client_id' => $clientId,
+                    'client_name' => $booking->client->person->full_name ?? 'Unknown',
+                    'booking_id' => $booking->id,
+                    'visit_id' => null,
+                    'status' => 'confirmed',
+                    'source' => 'booking',
+                    'is_manual' => false,
+                ];
+            }
+        }
+
+        // Добавить/обновить посещения
+        foreach ($visits as $visit) {
+            $clientId = $visit->client_id;
+            $participants[$clientId] = [
+                'client_id' => $clientId,
+                'client_name' => $visit->client->person->full_name ?? 'Unknown',
+                'booking_id' => $participants[$clientId]['booking_id'] ?? null,
+                'visit_id' => $visit->id,
+                'status' => $visit->status,
+                'source' => $visit->is_manual_entry ? 'manual' : 'visit',
+                'is_manual' => $visit->is_manual_entry,
+            ];
+        }
+
+        return array_values($participants);
+    }
 }
