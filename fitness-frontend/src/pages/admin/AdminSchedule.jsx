@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { scheduleApi } from "../../api/schedule";
 
 const STATUS_MAP = {
@@ -22,6 +22,8 @@ export default function AdminSchedule() {
   });
 
   const [showCreate, setShowCreate] = useState(false);
+  // Флаг: авто-завершение уже запущено один раз за время жизни этой вкладки
+  const autoCompleteDoneRef = useRef(false);
 
   // Загрузка справочников
   useEffect(() => {
@@ -36,50 +38,31 @@ export default function AdminSchedule() {
     if (filters.trainer_id) params.trainer_id = filters.trainer_id;
     if (filters.hall_id) params.hall_id = filters.hall_id;
     if (filters.sort_slots) params.sort_slots = filters.sort_slots;
-    scheduleApi
+
+    // При первом обращении к расписанию завершаем все просроченные занятия,
+    // после чего грузим обновлённый список.
+    if (!autoCompleteDoneRef.current) {
+      autoCompleteDoneRef.current = true;
+      scheduleApi
+        .autoComplete()
+        .catch(() => {})
+        .finally(() => {
+          scheduleApi
+            .list(params)
+            .then((r) => setSessions(r.data.data))
+            .finally(() => setLoading(false));
+        });
+    } else {
+      scheduleApi
         .list(params)
         .then((r) => setSessions(r.data.data))
         .finally(() => setLoading(false));
+    }
   }, [filters]);
 
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
-
-  // Эффект для автоматического обновления статусов
-  useEffect(() => {
-    const updateStatuses = async () => {
-      const now = new Date();
-
-      // Находим сессии со статусом "scheduled" и временем начала < текущего времени
-      const sessionsToUpdate = sessions.filter(s => {
-        if (s.status !== 'scheduled') return false;
-        const sessionStart = new Date(s.starts_at);
-        return now > sessionStart;
-      });
-
-      // Обновляем каждую сессию
-      for (const session of sessionsToUpdate) {
-        try {
-          await scheduleApi.update(session.id, { status: 'in_progress' });
-        } catch (err) {
-          console.error(`Ошибка при обновлении статуса сессии ${session.id}:`, err);
-        }
-      }
-
-      // Если были обновления, перезагружаем список
-      if (sessionsToUpdate.length > 0) {
-        fetchSessions();
-      }
-    };
-
-    // Проверяем каждую минуту
-    const interval = setInterval(updateStatuses, 60000);
-    // Также проверяем сразу при загрузке
-    updateStatuses();
-
-    return () => clearInterval(interval);
-  }, [sessions, fetchSessions]);
 
   async function handleCancel(id) {
     if (!confirm("Отменить занятие? Все записи будут отменены.")) return;

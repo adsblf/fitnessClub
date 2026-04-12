@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { visitsApi } from "../api/visits";
 import ClientSearchAutocomplete from "./ClientSearchAutocomplete";
+import { TZ } from "../lib/tz";
 
 const STATUS_MAP = {
   visited: { label: "Посещено", cls: "bg-emerald-100 text-emerald-700", icon: "✓" },
@@ -72,12 +73,12 @@ export default function SessionVisitBlock({ session, onUpdated }) {
 
   const formatTime = (dateTime) => {
     const date = new Date(dateTime);
-    return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
   };
 
   const formatDate = (dateTime) => {
     const date = new Date(dateTime);
-    return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: TZ });
   };
 
   const startTime = formatTime(session.starts_at);

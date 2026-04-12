@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { visitsApi } from "../../api/visits";
 import SessionVisitBlock from "../../components/SessionVisitBlock";
 import QuickCheckIn from "../../components/QuickCheckIn";
+import { todayStr, daysAgoStr, firstOfMonthStr } from "../../lib/tz";
 
 export default function AdminVisits() {
   const [activeTab, setActiveTab] = useState("group"); // 'group', 'personal', 'checkin'
@@ -111,23 +112,19 @@ function GroupSessionsTab() {
   });
 
   const setTodayRange = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayStr();
     setFromDate(today);
     setToDate(today);
   };
 
   const setWeekRange = () => {
-    const today = new Date();
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    setFromDate(weekAgo.toISOString().split("T")[0]);
-    setToDate(today.toISOString().split("T")[0]);
+    setFromDate(daysAgoStr(7));
+    setToDate(todayStr());
   };
 
   const setMonthRange = () => {
-    const today = new Date();
-    const monthAgo = new Date(today.getFullYear(), today.getMonth(), 1);
-    setFromDate(monthAgo.toISOString().split("T")[0]);
-    setToDate(today.toISOString().split("T")[0]);
+    setFromDate(firstOfMonthStr());
+    setToDate(todayStr());
   };
 
   const resetFilters = () => {
@@ -311,23 +308,19 @@ function PersonalSessionsTab() {
   });
 
   const setTodayRange = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayStr();
     setFromDate(today);
     setToDate(today);
   };
 
   const setWeekRange = () => {
-    const today = new Date();
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    setFromDate(weekAgo.toISOString().split("T")[0]);
-    setToDate(today.toISOString().split("T")[0]);
+    setFromDate(daysAgoStr(7));
+    setToDate(todayStr());
   };
 
   const setMonthRange = () => {
-    const today = new Date();
-    const monthAgo = new Date(today.getFullYear(), today.getMonth(), 1);
-    setFromDate(monthAgo.toISOString().split("T")[0]);
-    setToDate(today.toISOString().split("T")[0]);
+    setFromDate(firstOfMonthStr());
+    setToDate(todayStr());
   };
 
   const resetFilters = () => {

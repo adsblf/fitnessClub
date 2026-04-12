@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { scheduleApi } from "../../api/schedule";
 import { bookingsApi } from "../../api/bookings";
+import { TZ } from "../../lib/tz";
 
 export default function BookingConfirm() {
     const { id } = useParams();
@@ -59,6 +60,7 @@ export default function BookingConfirm() {
         weekday: "long",
         day: "numeric",
         month: "long",
+        timeZone: TZ,
     });
 
     if (status === "success") {

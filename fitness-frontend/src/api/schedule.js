@@ -16,6 +16,9 @@ export const scheduleApi = {
     cancel(id) {
         return api.post(`/schedule/${id}/cancel`);
     },
+    autoComplete() {
+        return api.post("/schedule/auto-complete");
+    },
     halls() {
         return api.get("/halls");
     },

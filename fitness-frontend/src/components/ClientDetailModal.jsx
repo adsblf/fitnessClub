@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { clientsApi } from "../api/clients";
+import { todayStr } from "../lib/tz";
 
 const STATUS = {
     active:   { label: "Активен",     cls: "bg-emerald-100 text-emerald-700" },
@@ -306,7 +307,7 @@ function EditMode({ detail, onCancel, onSaved }) {
         }
         if (
             form.passport_issued_at &&
-            form.passport_issued_at > new Date().toISOString().split("T")[0]
+            form.passport_issued_at > todayStr()
         ) {
             e.passport_issued_at = "Дата не может быть в будущем";
         }

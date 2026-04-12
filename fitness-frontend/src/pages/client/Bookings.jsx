@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { bookingsApi } from "../../api/bookings";
+import { TZ } from "../../lib/tz";
 
 const BOOKING_STATUS_MAP = {
   pending:    { label: "Ожидает подтверждения", cls: "bg-amber-100 text-amber-700", icon: "⏳" },
@@ -36,7 +37,8 @@ function BookingCard({ booking, onAction }) {
     weekday: "long",
     day: "numeric",
     month: "long",
-    year: "numeric"
+    year: "numeric",
+    timeZone: TZ,
   });
 
   const timeStr = `${booking.time_start}–${booking.time_end}`;

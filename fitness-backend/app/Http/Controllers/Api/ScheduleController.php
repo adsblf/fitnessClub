@@ -211,6 +211,20 @@ class ScheduleController extends Controller
     }
 
     /**
+     * POST /api/v1/schedule/auto-complete
+     * Завершить все прошедшие занятия со статусом «scheduled».
+     * Вызывается один раз при открытии вкладки расписания администратором.
+     */
+    public function autoComplete(): JsonResponse
+    {
+        $updated = Session::where('status', 'scheduled')
+            ->where('ends_at', '<', now())
+            ->update(['status' => 'completed']);
+
+        return response()->json(['updated' => $updated]);
+    }
+
+    /**
      * POST /api/v1/schedule/{id}/cancel
      * Отменить занятие.
      */
