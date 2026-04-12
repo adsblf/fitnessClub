@@ -17,6 +17,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
   const [error, setError] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [updatingVisitId, setUpdatingVisitId] = useState(null);
+  const [isEditingFinished, setIsEditingFinished] = useState(false);
 
   const handleUpdateVisitStatus = async (participantId, newStatus) => {
     setUpdatingVisitId(participantId);
@@ -83,6 +84,11 @@ export default function SessionVisitBlock({ session, onUpdated }) {
   const endTime = formatTime(session.ends_at);
   const dateStr = formatDate(session.starts_at);
 
+  // Проверяем, наступило ли время начала тренировки
+  const sessionStartDate = new Date(session.starts_at);
+  const sessionEndDate = new Date(session.ends_at);
+  const isSessionStarted = new Date() >= sessionStartDate;
+
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
       {/* Заголовок блока */}
@@ -108,7 +114,15 @@ export default function SessionVisitBlock({ session, onUpdated }) {
             </div>
           </div>
           <div className="text-right">
-            {session.is_editable ? (
+            {!isSessionStarted ? (
+              <div className="inline-flex px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                ⏳ Ожидание начала
+              </div>
+            ) : isEditingFinished ? (
+              <div className="inline-flex px-3 py-1 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded-full text-xs font-medium">
+                ✓ Редактирование завершено
+              </div>
+            ) : session.is_editable ? (
               <div className="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
                 ✓ Редактировать можно
               </div>
@@ -129,13 +143,13 @@ export default function SessionVisitBlock({ session, onUpdated }) {
               <th className="text-left px-5 py-2.5 font-normal">ФИО</th>
               <th className="text-left px-5 py-2.5 font-normal">Телефон</th>
               <th className="text-left px-5 py-2.5 font-normal">Статус</th>
-              {session.is_editable && <th className="text-center px-5 py-2.5 font-normal">Действие</th>}
+              {isSessionStarted && session.is_editable && !isEditingFinished && <th className="text-center px-5 py-2.5 font-normal">Действие</th>}
             </tr>
           </thead>
           <tbody>
             {session.participants.length === 0 ? (
               <tr>
-                <td colSpan={session.is_editable ? "4" : "3"} className="px-5 py-4 text-center text-zinc-400">
+                <td colSpan={isSessionStarted && session.is_editable && !isEditingFinished ? "4" : "3"} className="px-5 py-4 text-center text-zinc-400">
                   Нет записей
                 </td>
               </tr>
@@ -161,7 +175,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
                         {statusInfo.label}
                       </span>
                     </td>
-                    {session.is_editable && (
+                    {isSessionStarted && session.is_editable && !isEditingFinished && (
                       <td className="px-5 py-3 text-center">
                         <div className="flex justify-center gap-2">
                           {/* Галочка - Посещено */}
@@ -202,58 +216,88 @@ export default function SessionVisitBlock({ session, onUpdated }) {
         </table>
       </div>
 
-      {/* Кнопка добавления клиента (если редактируемо) */}
-      {session.is_editable && (
-        <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-          {!showAddClient ? (
-            <button
-              onClick={() => setShowAddClient(true)}
-              className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-2"
-            >
-              + Добавить клиента
-            </button>
+      {/* Кнопка добавления клиента и завершения редактирования */}
+      {isSessionStarted && session.is_editable && (
+        <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 space-y-3">
+          {!isEditingFinished ? (
+            <>
+              {!showAddClient ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowAddClient(true)}
+                    className="flex-1 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center gap-2 py-2"
+                  >
+                    + Добавить клиента
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingFinished(true);
+                      setShowAddClient(false);
+                    }}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    ✓ Закончить редактирование
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {error && <div className="text-sm text-red-500">{error}</div>}
+
+                  <ClientSearchAutocomplete
+                    onSelect={setSelectedClient}
+                    placeholder="Поиск клиента..."
+                  />
+
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Статус</label>
+                    <select
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none"
+                    >
+                      <option value="visited">Посещено</option>
+                      <option value="late">Опоздание</option>
+                      <option value="no_show">Неявка</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddClient}
+                      disabled={addingClient || !selectedClient}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                      {addingClient ? "Добавление..." : "Добавить"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAddClient(false);
+                        setSelectedClient(null);
+                        setSelectedStatus("visited");
+                        setError(null);
+                      }}
+                      className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-zinc-100 rounded-lg text-sm font-medium"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
-            <div className="space-y-3">
-              {error && <div className="text-sm text-red-500">{error}</div>}
-
-              <ClientSearchAutocomplete
-                onSelect={setSelectedClient}
-                placeholder="Поиск клиента..."
-              />
-
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">Статус</label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none"
-                >
-                  <option value="visited">Посещено</option>
-                  <option value="late">Опоздание</option>
-                  <option value="no_show">Неявка</option>
-                </select>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleAddClient}
-                  disabled={addingClient || !selectedClient}
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                >
-                  {addingClient ? "Добавление..." : "Добавить"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddClient(false);
-                    setSelectedClient(null);
-                    setSelectedStatus("visited");
-                    setError(null);
-                  }}
-                  className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-zinc-100 rounded-lg text-sm font-medium"
-                >
-                  Отмена
-                </button>
-              </div>
+            <div className="flex items-center justify-between py-2 px-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-100">
+                ✓ Редактирование завершено
+              </span>
+              <button
+                onClick={() => {
+                  setIsEditingFinished(false);
+                  setShowAddClient(false);
+                }}
+                className="text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 underline"
+              >
+                Вернуться
+              </button>
             </div>
           )}
         </div>

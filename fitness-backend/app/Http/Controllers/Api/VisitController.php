@@ -157,7 +157,7 @@ class VisitController extends Controller
             'visits' => function ($q) {
                 $q->with(['client.person']);
             },
-        ])->orderByDesc('starts_at');
+        ])->orderBy('starts_at', 'asc');
 
         // Фильтр по дате (от)
         if ($fromDate = $request->query('from_date')) {

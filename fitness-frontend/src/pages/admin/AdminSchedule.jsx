@@ -46,6 +46,41 @@ export default function AdminSchedule() {
     fetchSessions();
   }, [fetchSessions]);
 
+  // Эффект для автоматического обновления статусов
+  useEffect(() => {
+    const updateStatuses = async () => {
+      const now = new Date();
+
+      // Находим сессии со статусом "scheduled" и временем начала < текущего времени
+      const sessionsToUpdate = sessions.filter(s => {
+        if (s.status !== 'scheduled') return false;
+        const sessionStart = new Date(s.starts_at);
+        return now > sessionStart;
+      });
+
+      // Обновляем каждую сессию
+      for (const session of sessionsToUpdate) {
+        try {
+          await scheduleApi.update(session.id, { status: 'in_progress' });
+        } catch (err) {
+          console.error(`Ошибка при обновлении статуса сессии ${session.id}:`, err);
+        }
+      }
+
+      // Если были обновления, перезагружаем список
+      if (sessionsToUpdate.length > 0) {
+        fetchSessions();
+      }
+    };
+
+    // Проверяем каждую минуту
+    const interval = setInterval(updateStatuses, 60000);
+    // Также проверяем сразу при загрузке
+    updateStatuses();
+
+    return () => clearInterval(interval);
+  }, [sessions, fetchSessions]);
+
   async function handleCancel(id) {
     if (!confirm("Отменить занятие? Все записи будут отменены.")) return;
     await scheduleApi.cancel(id);

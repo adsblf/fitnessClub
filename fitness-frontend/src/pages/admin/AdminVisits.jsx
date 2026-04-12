@@ -62,6 +62,7 @@ function GroupSessionsTab() {
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [subTab, setSubTab] = useState("current"); // 'current' или 'archive'
 
   const fetch = useCallback(
     (page = 1) => {
@@ -93,6 +94,22 @@ function GroupSessionsTab() {
     fetch(1);
   }, [fetch]);
 
+  // Фильтруем сессии по архиву/текущим
+  const now = new Date();
+  const filteredSessions = sessions.filter(session => {
+    const sessionEnd = new Date(session.ends_at);
+    // Добавляем 1 час к времени окончания для определения времени архивирования
+    const archiveTime = new Date(sessionEnd.getTime() + 60 * 60 * 1000);
+
+    if (subTab === "current") {
+      // Текущие: время архивирования еще не наступило
+      return now < archiveTime;
+    } else {
+      // Архив: время архивирования наступило
+      return now >= archiveTime;
+    }
+  });
+
   const setTodayRange = () => {
     const today = new Date().toISOString().split("T")[0];
     setFromDate(today);
@@ -120,6 +137,30 @@ function GroupSessionsTab() {
 
   return (
     <div className="space-y-4">
+      {/* Подвкладки */}
+      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        <button
+          onClick={() => setSubTab("current")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "current"
+              ? "border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100"
+              : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          }`}
+        >
+          📅 Текущие и предстоящие
+        </button>
+        <button
+          onClick={() => setSubTab("archive")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "archive"
+              ? "border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100"
+              : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          }`}
+        >
+          📦 Архив
+        </button>
+      </div>
+
       {/* Фильтры */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
@@ -176,12 +217,14 @@ function GroupSessionsTab() {
       <div className="space-y-4">
         {loading ? (
           <div className="text-center py-8 text-zinc-400">Загрузка...</div>
-        ) : sessions.length === 0 ? (
+        ) : filteredSessions.length === 0 ? (
           <div className="text-center py-8 text-zinc-400">
-            Групповые тренировки не найдены
+            {subTab === "current"
+              ? "Нет предстоящих групповых тренировок"
+              : "Архив групповых тренировок пуст"}
           </div>
         ) : (
-          sessions.map((session) => (
+          filteredSessions.map((session) => (
             <SessionVisitBlock
               key={session.id}
               session={session}
@@ -219,6 +262,7 @@ function PersonalSessionsTab() {
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [subTab, setSubTab] = useState("current"); // 'current' или 'archive'
 
   const fetch = useCallback(
     (page = 1) => {
@@ -250,6 +294,22 @@ function PersonalSessionsTab() {
     fetch(1);
   }, [fetch]);
 
+  // Фильтруем сессии по архиву/текущим
+  const now = new Date();
+  const filteredSessions = sessions.filter(session => {
+    const sessionEnd = new Date(session.ends_at);
+    // Добавляем 1 час к времени окончания для определения времени архивирования
+    const archiveTime = new Date(sessionEnd.getTime() + 60 * 60 * 1000);
+
+    if (subTab === "current") {
+      // Текущие: время архивирования еще не наступило
+      return now < archiveTime;
+    } else {
+      // Архив: время архивирования наступило
+      return now >= archiveTime;
+    }
+  });
+
   const setTodayRange = () => {
     const today = new Date().toISOString().split("T")[0];
     setFromDate(today);
@@ -277,6 +337,30 @@ function PersonalSessionsTab() {
 
   return (
     <div className="space-y-4">
+      {/* Подвкладки */}
+      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        <button
+          onClick={() => setSubTab("current")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "current"
+              ? "border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100"
+              : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          }`}
+        >
+          📅 Текущие и предстоящие
+        </button>
+        <button
+          onClick={() => setSubTab("archive")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "archive"
+              ? "border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100"
+              : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          }`}
+        >
+          📦 Архив
+        </button>
+      </div>
+
       {/* Фильтры */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
@@ -333,12 +417,14 @@ function PersonalSessionsTab() {
       <div className="space-y-4">
         {loading ? (
           <div className="text-center py-8 text-zinc-400">Загрузка...</div>
-        ) : sessions.length === 0 ? (
+        ) : filteredSessions.length === 0 ? (
           <div className="text-center py-8 text-zinc-400">
-            Персональные тренировки не найдены
+            {subTab === "current"
+              ? "Нет предстоящих персональных тренировок"
+              : "Архив персональных тренировок пуст"}
           </div>
         ) : (
-          sessions.map((session) => (
+          filteredSessions.map((session) => (
             <SessionVisitBlock
               key={session.id}
               session={session}
