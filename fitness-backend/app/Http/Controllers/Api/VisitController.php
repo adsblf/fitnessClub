@@ -79,6 +79,32 @@ class VisitController extends Controller
     }
 
     /**
+     * PUT /api/v1/visits/{id}
+     * Изменить статус существующего посещения без повторного списания с абонемента.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|in:visited,no_show,late',
+            'notes'  => 'nullable|string|max:500',
+        ]);
+
+        $visit = Visit::findOrFail($id);
+        $visit->status = $request->status;
+        if ($request->has('notes')) {
+            $visit->notes = $request->input('notes');
+        }
+        $visit->save();
+
+        $visit->load(['client.person', 'session', 'membership']);
+
+        return response()->json([
+            'message' => 'Статус посещения обновлён',
+            'data'    => $this->formatVisit($visit),
+        ]);
+    }
+
+    /**
      * GET /api/v1/visits
      * Список посещений с фильтрацией.
      */

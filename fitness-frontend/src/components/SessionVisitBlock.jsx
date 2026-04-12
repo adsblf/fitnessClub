@@ -4,95 +4,125 @@ import ClientSearchAutocomplete from "./ClientSearchAutocomplete";
 import { TZ } from "../lib/tz";
 
 const STATUS_MAP = {
-  visited: { label: "Посещено", cls: "bg-emerald-100 text-emerald-700", icon: "✓" },
-  no_show: { label: "Неявка", cls: "bg-red-100 text-red-600", icon: "✕" },
-  late: { label: "Опоздание", cls: "bg-amber-100 text-amber-700", icon: "⏱" },
-  confirmed: { label: "Записан", cls: "bg-blue-100 text-blue-700" },
-  pending: { label: "Ожидание", cls: "bg-gray-100 text-gray-700" },
+  visited:   { label: "Посещено",  cls: "bg-emerald-100 text-emerald-700" },
+  no_show:   { label: "Неявка",    cls: "bg-red-100 text-red-600" },
+  late:      { label: "Опоздание", cls: "bg-amber-100 text-amber-700" },
+  confirmed: { label: "Записан",   cls: "bg-blue-100 text-blue-700" },
+  pending:   { label: "Ожидание",  cls: "bg-zinc-100 text-zinc-500" },
 };
 
-export default function SessionVisitBlock({ session, onUpdated }) {
-  const [showAddClient, setShowAddClient] = useState(false);
-  const [addingClient, setAddingClient] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState("visited");
-  const [error, setError] = useState(null);
-  const [selectedClient, setSelectedClient] = useState(null);
-  const [updatingVisitId, setUpdatingVisitId] = useState(null);
-  const [isEditingFinished, setIsEditingFinished] = useState(false);
+const ACTION_BTNS = [
+  { status: "visited", icon: "✓", label: "Посещено",  active: "bg-emerald-500 text-white", idle: "hover:bg-emerald-50 hover:text-emerald-700" },
+  { status: "late",    icon: "⏱", label: "Опоздание", active: "bg-amber-400 text-white",   idle: "hover:bg-amber-50 hover:text-amber-700" },
+  { status: "no_show", icon: "✕", label: "Неявка",    active: "bg-red-500 text-white",     idle: "hover:bg-red-50 hover:text-red-600" },
+];
 
-  const handleUpdateVisitStatus = async (participantId, newStatus) => {
-    setUpdatingVisitId(participantId);
+/**
+ * editingState:
+ *   'idle'    – тренировка началась, но редактирование ещё не открывалось → большая зелёная кнопка
+ *   'editing' – редактирование открыто → кнопки ✓/⏱/✕ + "Закончить редактирование"
+ *   'done'    – сохранено → маленькая серая кнопка "Редактировать"
+ */
+export default function SessionVisitBlock({ session, onUpdated }) {
+  // Уникальный ключ state по id занятия не нужен — компонент живёт пока открыта вкладка
+  const [editingState, setEditingState] = useState("idle");
+  // Промежуточные статусы: { [client_id]: 'visited' | 'no_show' | 'late' | 'confirmed' | … }
+  const [localStatuses, setLocalStatuses] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  // Форма добавления клиента
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [addStatus, setAddStatus] = useState("visited");
+  const [addingClient, setAddingClient] = useState(false);
+  const [addError, setAddError] = useState(null);
+
+  /* ── Форматирование ──────────────────────────────── */
+  const fmt = (dt, opts) => new Date(dt).toLocaleString("ru-RU", { ...opts, timeZone: TZ });
+  const startTime = fmt(session.starts_at, { hour: "2-digit", minute: "2-digit" });
+  const endTime   = fmt(session.ends_at,   { hour: "2-digit", minute: "2-digit" });
+  const dateStr   = fmt(session.starts_at, { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  /* ── Открыть режим редактирования ───────────────── */
+  const startEditing = () => {
+    const init = {};
+    session.participants.forEach((p) => { init[p.client_id] = p.status; });
+    setLocalStatuses(init);
+    setEditingState("editing");
+    setShowAddClient(false);
+    setSaveError(null);
+  };
+
+  /* ── Изменить статус участника локально ─────────── */
+  const setClientStatus = (clientId, status) => {
+    setLocalStatuses((prev) => ({ ...prev, [clientId]: status }));
+  };
+
+  /* ── Сохранить всё и закрыть редактирование ──────── */
+  const handleFinishEditing = async () => {
+    setSaving(true);
+    setSaveError(null);
     try {
-      const participant = session.participants.find(p => p.client_id === participantId);
-      if (participant?.visit_id) {
-        await visitsApi.create({
-          client_id: participantId,
-          session_id: session.id,
-          status: newStatus,
-        });
-        onUpdated();
+      const toSave = session.participants.filter((p) => {
+        const ns = localStatuses[p.client_id];
+        return ns && ns !== p.status && ["visited", "no_show", "late"].includes(ns);
+      });
+
+      for (const participant of toSave) {
+        const newStatus = localStatuses[participant.client_id];
+        if (participant.visit_id) {
+          // Визит уже существует — обновляем статус без списания с абонемента
+          await visitsApi.update(participant.visit_id, { status: newStatus });
+        } else {
+          // Визита ещё нет — создаём (списывает 1 посещение с абонемента)
+          await visitsApi.create({
+            client_id: participant.client_id,
+            session_id: session.id,
+            status: newStatus,
+          });
+        }
       }
+
+      setEditingState("done");
+      onUpdated();
     } catch (err) {
-      console.error("Ошибка при обновлении статуса:", err);
+      setSaveError(err.response?.data?.message || "Ошибка при сохранении");
     } finally {
-      setUpdatingVisitId(null);
+      setSaving(false);
     }
   };
 
+  /* ── Добавить нового клиента ─────────────────────── */
   const handleAddClient = async () => {
-    if (!selectedClient) {
-      setError("Выберите клиента");
-      return;
-    }
-
-    if (!selectedClient.active_membership) {
-      setError("У клиента нет активного абонемента");
-      return;
-    }
-
+    if (!selectedClient) { setAddError("Выберите клиента"); return; }
+    if (!selectedClient.active_membership) { setAddError("У клиента нет активного абонемента"); return; }
     setAddingClient(true);
-    setError(null);
-
+    setAddError(null);
     try {
       await visitsApi.create({
         client_id: selectedClient.person_id,
         session_id: session.id,
-        status: selectedStatus,
+        status: addStatus,
       });
-
       setShowAddClient(false);
       setSelectedClient(null);
-      setSelectedStatus("visited");
+      setAddStatus("visited");
       onUpdated();
     } catch (err) {
-      setError(err.response?.data?.message || "Ошибка при добавлении посещения");
+      setAddError(err.response?.data?.message || "Ошибка при добавлении");
     } finally {
       setAddingClient(false);
     }
   };
 
-  const formatTime = (dateTime) => {
-    const date = new Date(dateTime);
-    return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
-  };
-
-  const formatDate = (dateTime) => {
-    const date = new Date(dateTime);
-    return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: TZ });
-  };
-
-  const startTime = formatTime(session.starts_at);
-  const endTime = formatTime(session.ends_at);
-  const dateStr = formatDate(session.starts_at);
-
-  // Проверяем, наступило ли время начала тренировки
-  const sessionStartDate = new Date(session.starts_at);
-  const sessionEndDate = new Date(session.ends_at);
-  const isSessionStarted = new Date() >= sessionStartDate;
+  const isSessionStarted = session.is_editable; // now >= starts_at (server-side)
+  const showActionCol = editingState === "editing";
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-      {/* Заголовок блока */}
+
+      {/* ── Заголовок ──────────────────────────────── */}
       <div className="bg-gradient-to-r from-zinc-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-900 px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -100,112 +130,80 @@ export default function SessionVisitBlock({ session, onUpdated }) {
               {session.session_name}
             </h3>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              <span className="flex items-center gap-1">
-                📅 {dateStr}
-              </span>
-              <span className="flex items-center gap-1">
-                🕐 {startTime} – {endTime}
-              </span>
-              <span className="flex items-center gap-1">
-                🏢 {session.hall_name}
-              </span>
-              <span className="flex items-center gap-1">
-                👨‍🏫 {session.trainer_name}
-              </span>
+              <span>📅 {dateStr}</span>
+              <span>🕐 {startTime} – {endTime}</span>
+              <span>🏢 {session.hall_name}</span>
+              <span>👨‍🏫 {session.trainer_name}</span>
             </div>
           </div>
-          <div className="text-right">
+          <div className="shrink-0">
             {!isSessionStarted ? (
-              <div className="inline-flex px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                ⏳ Ожидание начала
-              </div>
-            ) : isEditingFinished ? (
-              <div className="inline-flex px-3 py-1 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded-full text-xs font-medium">
-                ✓ Редактирование завершено
-              </div>
-            ) : session.is_editable ? (
-              <div className="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-                ✓ Редактировать можно
-              </div>
+              <span className="inline-flex px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">⏳ Ожидание начала</span>
+            ) : editingState === "editing" ? (
+              <span className="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">✏️ Идёт заполнение</span>
+            ) : editingState === "done" ? (
+              <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 rounded-full text-xs font-medium">✓ Посещаемость отмечена</span>
             ) : (
-              <div className="inline-flex px-3 py-1 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded-full text-xs font-medium">
-                Редактирование недоступно
-              </div>
+              <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500 rounded-full text-xs font-medium">Не заполнено</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Список участников */}
+      {/* ── Таблица участников ──────────────────────── */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-zinc-400 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
               <th className="text-left px-5 py-2.5 font-normal">ФИО</th>
-              <th className="text-left px-5 py-2.5 font-normal">Телефон</th>
               <th className="text-left px-5 py-2.5 font-normal">Статус</th>
-              {isSessionStarted && session.is_editable && !isEditingFinished && <th className="text-center px-5 py-2.5 font-normal">Действие</th>}
+              {showActionCol && <th className="text-center px-5 py-2.5 font-normal">Действие</th>}
             </tr>
           </thead>
           <tbody>
             {session.participants.length === 0 ? (
               <tr>
-                <td colSpan={isSessionStarted && session.is_editable && !isEditingFinished ? "4" : "3"} className="px-5 py-4 text-center text-zinc-400">
-                  Нет записей
-                </td>
+                <td colSpan={showActionCol ? 3 : 2} className="px-5 py-4 text-center text-zinc-400">Нет записей</td>
               </tr>
             ) : (
               session.participants.map((participant, idx) => {
-                const statusInfo = STATUS_MAP[participant.status] || {
-                  label: participant.status,
-                  cls: "bg-zinc-100 text-zinc-600",
-                };
+                const displayStatus = editingState === "editing"
+                  ? (localStatuses[participant.client_id] ?? participant.status)
+                  : participant.status;
+                const stInfo = STATUS_MAP[displayStatus] ?? { label: displayStatus, cls: "bg-zinc-100 text-zinc-600" };
                 return (
                   <tr
-                    key={`${participant.client_id}-${idx}`}
-                    className={`border-b border-zinc-50 dark:border-zinc-800 last:border-0 ${
-                      idx % 2 ? "bg-zinc-50/50 dark:bg-zinc-800/20" : ""
-                    }`}
+                    key={participant.client_id}
+                    className={`border-b border-zinc-50 dark:border-zinc-800 last:border-0 ${idx % 2 ? "bg-zinc-50/50 dark:bg-zinc-800/20" : ""}`}
                   >
-                    <td className="px-5 py-3 text-zinc-800 dark:text-zinc-200 font-medium">
+                    <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">
                       {participant.client_name}
                     </td>
-                    <td className="px-5 py-3 text-zinc-500 text-xs">—</td>
                     <td className="px-5 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${statusInfo.cls}`}>
-                        {statusInfo.label}
+                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${stInfo.cls}`}>
+                        {stInfo.label}
                       </span>
                     </td>
-                    {isSessionStarted && session.is_editable && !isEditingFinished && (
-                      <td className="px-5 py-3 text-center">
-                        <div className="flex justify-center gap-2">
-                          {/* Галочка - Посещено */}
-                          <button
-                            onClick={() => handleUpdateVisitStatus(participant.client_id, "visited")}
-                            disabled={updatingVisitId === participant.client_id || participant.status === "visited"}
-                            className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
-                              participant.status === "visited"
-                                ? "bg-emerald-200 text-emerald-700"
-                                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-emerald-100"
-                            }`}
-                            title="Отметить как посещено"
-                          >
-                            ✓
-                          </button>
-
-                          {/* Крестик - Неявка */}
-                          <button
-                            onClick={() => handleUpdateVisitStatus(participant.client_id, "no_show")}
-                            disabled={updatingVisitId === participant.client_id || participant.status === "no_show"}
-                            className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
-                              participant.status === "no_show"
-                                ? "bg-red-200 text-red-700"
-                                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-red-100"
-                            }`}
-                            title="Отметить как неявка"
-                          >
-                            ✕
-                          </button>
+                    {showActionCol && (
+                      <td className="px-5 py-3">
+                        <div className="flex justify-center gap-1.5">
+                          {ACTION_BTNS.map(({ status, icon, label, active, idle }) => {
+                            const isCurrent = (localStatuses[participant.client_id] ?? participant.status) === status;
+                            return (
+                              <button
+                                key={status}
+                                onClick={() => setClientStatus(participant.client_id, status)}
+                                title={label}
+                                className={`w-8 h-8 rounded flex items-center justify-center text-sm font-semibold transition-colors ${
+                                  isCurrent
+                                    ? active
+                                    : `bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 ${idle}`
+                                }`}
+                              >
+                                {icon}
+                              </button>
+                            );
+                          })}
                         </div>
                       </td>
                     )}
@@ -217,43 +215,52 @@ export default function SessionVisitBlock({ session, onUpdated }) {
         </table>
       </div>
 
-      {/* Кнопка добавления клиента и завершения редактирования */}
-      {isSessionStarted && session.is_editable && (
-        <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 space-y-3">
-          {!isEditingFinished ? (
-            <>
+      {/* ── Панель действий внизу ───────────────────── */}
+      {isSessionStarted && (
+        <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+
+          {/* Первое открытие — большая зелёная кнопка */}
+          {editingState === "idle" && (
+            <div className="flex justify-end">
+              <button
+                onClick={startEditing}
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+              >
+                ✓ Начать отметку посещаемости
+              </button>
+            </div>
+          )}
+
+          {/* Режим редактирования */}
+          {editingState === "editing" && (
+            <div className="space-y-3">
+              {saveError && <p className="text-sm text-red-500">{saveError}</p>}
+
               {!showAddClient ? (
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowAddClient(true)}
-                    className="flex-1 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center gap-2 py-2"
+                    className="flex-1 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center gap-1"
                   >
                     + Добавить клиента
                   </button>
                   <button
-                    onClick={() => {
-                      setIsEditingFinished(true);
-                      setShowAddClient(false);
-                    }}
-                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    onClick={handleFinishEditing}
+                    disabled={saving}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    ✓ Закончить редактирование
+                    {saving ? "Сохранение…" : "✓ Закончить редактирование"}
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {error && <div className="text-sm text-red-500">{error}</div>}
-
-                  <ClientSearchAutocomplete
-                    onSelect={setSelectedClient}
-                    placeholder="Поиск клиента..."
-                  />
-
+                  {addError && <p className="text-sm text-red-500">{addError}</p>}
+                  <ClientSearchAutocomplete onSelect={setSelectedClient} placeholder="Поиск клиента…" />
                   <div>
                     <label className="block text-xs text-zinc-500 mb-1">Статус</label>
                     <select
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      value={addStatus}
+                      onChange={(e) => setAddStatus(e.target.value)}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none"
                     >
                       <option value="visited">Посещено</option>
@@ -261,22 +268,16 @@ export default function SessionVisitBlock({ session, onUpdated }) {
                       <option value="no_show">Неявка</option>
                     </select>
                   </div>
-
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddClient}
                       disabled={addingClient || !selectedClient}
                       className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
                     >
-                      {addingClient ? "Добавление..." : "Добавить"}
+                      {addingClient ? "Добавление…" : "Добавить"}
                     </button>
                     <button
-                      onClick={() => {
-                        setShowAddClient(false);
-                        setSelectedClient(null);
-                        setSelectedStatus("visited");
-                        setError(null);
-                      }}
+                      onClick={() => { setShowAddClient(false); setSelectedClient(null); setAddStatus("visited"); setAddError(null); }}
                       className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-zinc-100 rounded-lg text-sm font-medium"
                     >
                       Отмена
@@ -284,23 +285,22 @@ export default function SessionVisitBlock({ session, onUpdated }) {
                   </div>
                 </div>
               )}
-            </>
-          ) : (
-            <div className="flex items-center justify-between py-2 px-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-100">
-                ✓ Редактирование завершено
-              </span>
+            </div>
+          )}
+
+          {/* Редактирование завершено — маленькая неакцентная кнопка */}
+          {editingState === "done" && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-400">Данные сохранены</span>
               <button
-                onClick={() => {
-                  setIsEditingFinished(false);
-                  setShowAddClient(false);
-                }}
-                className="text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 underline"
+                onClick={startEditing}
+                className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-600 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
-                Вернуться
+                Редактировать
               </button>
             </div>
           )}
+
         </div>
       )}
     </div>

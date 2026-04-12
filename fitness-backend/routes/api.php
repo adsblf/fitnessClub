@@ -114,8 +114,9 @@ Route::prefix('v1')->group(function () {
         // Посещения
         Route::prefix('visits')->group(function () {
             Route::get('/sessions-with-visits', [VisitController::class, 'sessionsWithVisits'])->middleware('role:admin,trainer');
-            Route::post('/', [VisitController::class, 'store'])->middleware('role:admin,trainer');
-            Route::get('/',  [VisitController::class, 'index'])->middleware('role:admin,owner');
+            Route::post('/',      [VisitController::class, 'store'])->middleware('role:admin,trainer');
+            Route::put('/{id}',   [VisitController::class, 'update'])->middleware('role:admin,trainer');
+            Route::get('/',       [VisitController::class, 'index'])->middleware('role:admin,owner');
         });
     });
 });
