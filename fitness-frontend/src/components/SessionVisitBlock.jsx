@@ -3,9 +3,9 @@ import { visitsApi } from "../api/visits";
 import ClientSearchAutocomplete from "./ClientSearchAutocomplete";
 
 const STATUS_MAP = {
-  visited: { label: "Посещено", cls: "bg-emerald-100 text-emerald-700" },
-  no_show: { label: "Неявка", cls: "bg-red-100 text-red-600" },
-  late: { label: "Опоздание", cls: "bg-amber-100 text-amber-700" },
+  visited: { label: "Посещено", cls: "bg-emerald-100 text-emerald-700", icon: "✓" },
+  no_show: { label: "Неявка", cls: "bg-red-100 text-red-600", icon: "✕" },
+  late: { label: "Опоздание", cls: "bg-amber-100 text-amber-700", icon: "⏱" },
   confirmed: { label: "Записан", cls: "bg-blue-100 text-blue-700" },
   pending: { label: "Ожидание", cls: "bg-gray-100 text-gray-700" },
 };
@@ -16,6 +16,26 @@ export default function SessionVisitBlock({ session, onUpdated }) {
   const [selectedStatus, setSelectedStatus] = useState("visited");
   const [error, setError] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [updatingVisitId, setUpdatingVisitId] = useState(null);
+
+  const handleUpdateVisitStatus = async (participantId, newStatus) => {
+    setUpdatingVisitId(participantId);
+    try {
+      const participant = session.participants.find(p => p.client_id === participantId);
+      if (participant?.visit_id) {
+        await visitsApi.create({
+          client_id: participantId,
+          session_id: session.id,
+          status: newStatus,
+        });
+        onUpdated();
+      }
+    } catch (err) {
+      console.error("Ошибка при обновлении статуса:", err);
+    } finally {
+      setUpdatingVisitId(null);
+    }
+  };
 
   const handleAddClient = async () => {
     if (!selectedClient) {
@@ -109,13 +129,13 @@ export default function SessionVisitBlock({ session, onUpdated }) {
               <th className="text-left px-5 py-2.5 font-normal">ФИО</th>
               <th className="text-left px-5 py-2.5 font-normal">Телефон</th>
               <th className="text-left px-5 py-2.5 font-normal">Статус</th>
-              <th className="text-left px-5 py-2.5 font-normal">Источник</th>
+              {session.is_editable && <th className="text-center px-5 py-2.5 font-normal">Действие</th>}
             </tr>
           </thead>
           <tbody>
             {session.participants.length === 0 ? (
               <tr>
-                <td colSpan="4" className="px-5 py-4 text-center text-zinc-400">
+                <td colSpan={session.is_editable ? "4" : "3"} className="px-5 py-4 text-center text-zinc-400">
                   Нет записей
                 </td>
               </tr>
@@ -141,11 +161,39 @@ export default function SessionVisitBlock({ session, onUpdated }) {
                         {statusInfo.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-zinc-500 text-xs">
-                      {participant.source === "booking" && "Запись"}
-                      {participant.source === "manual" && "Добавлено вручную"}
-                      {participant.source === "visit" && "Посещение"}
-                    </td>
+                    {session.is_editable && (
+                      <td className="px-5 py-3 text-center">
+                        <div className="flex justify-center gap-2">
+                          {/* Галочка - Посещено */}
+                          <button
+                            onClick={() => handleUpdateVisitStatus(participant.client_id, "visited")}
+                            disabled={updatingVisitId === participant.client_id || participant.status === "visited"}
+                            className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
+                              participant.status === "visited"
+                                ? "bg-emerald-200 text-emerald-700"
+                                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-emerald-100"
+                            }`}
+                            title="Отметить как посещено"
+                          >
+                            ✓
+                          </button>
+
+                          {/* Крестик - Неявка */}
+                          <button
+                            onClick={() => handleUpdateVisitStatus(participant.client_id, "no_show")}
+                            disabled={updatingVisitId === participant.client_id || participant.status === "no_show"}
+                            className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
+                              participant.status === "no_show"
+                                ? "bg-red-200 text-red-700"
+                                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-red-100"
+                            }`}
+                            title="Отметить как неявка"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })

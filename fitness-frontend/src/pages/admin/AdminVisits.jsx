@@ -73,8 +73,10 @@ function GroupSessionsTab() {
       visitsApi
         .sessionsWithVisits(params)
         .then((r) => {
-          // Фильтруем только групповые тренировки
-          const groupSessions = r.data.data.filter(s => s.type === 'group');
+          // Фильтруем только групповые тренировки и исключаем отменённые
+          const groupSessions = r.data.data.filter(s =>
+            s.type === 'group' && s.status !== 'cancelled'
+          );
           setSessions(groupSessions);
           setMeta(r.data.meta);
         })
@@ -228,8 +230,10 @@ function PersonalSessionsTab() {
       visitsApi
         .sessionsWithVisits(params)
         .then((r) => {
-          // Фильтруем только персональные тренировки
-          const personalSessions = r.data.data.filter(s => s.type === 'personal');
+          // Фильтруем только персональные тренировки и исключаем отменённые
+          const personalSessions = r.data.data.filter(s =>
+            s.type === 'personal' && s.status !== 'cancelled'
+          );
           setSessions(personalSessions);
           setMeta(r.data.meta);
         })
