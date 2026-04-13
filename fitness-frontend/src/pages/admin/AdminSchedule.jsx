@@ -22,6 +22,7 @@ export default function AdminSchedule() {
   });
 
   const [showCreate, setShowCreate] = useState(false);
+  const [editSession, setEditSession] = useState(null);
   // Флаг: авто-завершение уже запущено один раз за время жизни этой вкладки
   const autoCompleteDoneRef = useRef(false);
 
@@ -226,9 +227,17 @@ export default function AdminSchedule() {
                         </td>
                         <td className="px-5 py-3">
                           {s.status === "scheduled" && (
-                              <button onClick={() => handleCancel(s.id)} className="text-xs text-red-500 hover:underline">
-                                Отменить
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setEditSession(s)}
+                                    className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:underline"
+                                >
+                                  Редактировать
+                                </button>
+                                <button onClick={() => handleCancel(s.id)} className="text-xs text-red-500 hover:underline">
+                                  Отменить
+                                </button>
+                              </div>
                           )}
                         </td>
                       </tr>
@@ -246,6 +255,19 @@ export default function AdminSchedule() {
                 onClose={() => setShowCreate(false)}
                 onCreated={() => {
                   setShowCreate(false);
+                  fetchSessions();
+                }}
+            />
+        )}
+
+        {editSession && (
+            <EditSessionModal
+                session={editSession}
+                halls={halls}
+                trainers={trainers}
+                onClose={() => setEditSession(null)}
+                onSaved={() => {
+                  setEditSession(null);
                   fetchSessions();
                 }}
             />
@@ -403,6 +425,147 @@ function InputField({ label, ...props }) {
             className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-400"
             {...props}
         />
+      </div>
+  );
+}
+
+// ── Модалка редактирования занятия ────────────────
+function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
+  const toDateTimeLocal = (dt) => dt ? dt.slice(0, 16).replace(' ', 'T') : '';
+
+  const [form, setForm] = useState({
+    name:             session.name ?? '',
+    starts_at:        toDateTimeLocal(session.starts_at),
+    ends_at:          toDateTimeLocal(session.ends_at),
+    hall_id:          session.hall?.id ?? '',
+    trainer_id:       session.trainer?.id ?? '',
+    max_participants: session.max_participants ?? '',
+    difficulty_level: session.difficulty_level ?? 'Начальный',
+    notes:            session.notes ?? '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const data = {};
+      if (form.starts_at)         data.starts_at        = form.starts_at;
+      if (form.ends_at)           data.ends_at          = form.ends_at;
+      if (form.hall_id !== '')    data.hall_id          = Number(form.hall_id);
+      if (form.trainer_id !== '') data.trainer_id       = Number(form.trainer_id);
+      data.notes = form.notes;
+      if (session.type === 'group') {
+        if (form.name)             data.name             = form.name;
+        if (form.max_participants) data.max_participants = Number(form.max_participants);
+        if (form.difficulty_level) data.difficulty_level = form.difficulty_level;
+      }
+      await scheduleApi.update(session.id, data);
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Ошибка сохранения');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function set(field) {
+    return (e) => setForm({ ...form, [field]: e.target.value });
+  }
+
+  return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+        <div
+            className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Редактировать занятие</h2>
+          <p className="text-xs text-zinc-400 mb-4">
+            {session.type === 'group' ? 'Групповое' : 'Персональное'} · {session.date}
+          </p>
+          {error && <div className="text-sm text-red-500 mb-3">{error}</div>}
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {session.type === 'group' && (
+                <>
+                  <InputField label="Название" value={form.name} onChange={set('name')} />
+                  <InputField label="Макс. участников" type="number" min="1" value={form.max_participants} onChange={set('max_participants')} />
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Уровень</label>
+                    <select
+                        value={form.difficulty_level}
+                        onChange={set('difficulty_level')}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option>Начальный</option>
+                      <option>Средний</option>
+                      <option>Высокий</option>
+                    </select>
+                  </div>
+                </>
+            )}
+
+            <InputField label="Начало" type="datetime-local" value={form.starts_at} onChange={set('starts_at')} />
+            <InputField label="Окончание" type="datetime-local" value={form.ends_at} onChange={set('ends_at')} />
+
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Зал</label>
+              <select
+                  value={form.hall_id}
+                  onChange={set('hall_id')}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              >
+                <option value="">— Не выбран —</option>
+                {halls.map((h) => (
+                    <option key={h.id} value={h.id}>Зал {h.number} ({h.type}, {h.capacity} мест)</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Тренер</label>
+              <select
+                  value={form.trainer_id}
+                  onChange={set('trainer_id')}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              >
+                <option value="">— Не выбран —</option>
+                {trainers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.full_name} ({t.specialization})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Заметки</label>
+              <textarea
+                  value={form.notes}
+                  onChange={set('notes')}
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-400 resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:opacity-80 disabled:opacity-50"
+              >
+                {loading ? 'Сохранение...' : 'Сохранить'}
+              </button>
+              <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-400"
+              >
+                Отмена
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
   );
 }
