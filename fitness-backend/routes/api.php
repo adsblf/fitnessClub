@@ -45,7 +45,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('role:admin,owner');
 
         Route::get('bookings/pending', [DashboardController::class, 'pendingBookings'])
-            ->middleware('role:admin');
+            ->middleware('role:admin,owner');
 
         Route::get('sales', [DashboardController::class, 'salesHistory'])
             ->middleware('role:admin,owner');
@@ -71,9 +71,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/{id}/bookings', [BookingController::class, 'clientBookings'])
                 ->middleware('role:admin,owner,trainer,client');
 
-            // Учётные данные клиента (только админ)
+            // Учётные данные клиента (админ + владелец)
             Route::get('/{id}/credentials', [MembershipController::class, 'clientCredentials'])
-                ->middleware('role:admin');
+                ->middleware('role:admin,owner');
         });
 
         // Расписание
@@ -103,12 +103,12 @@ Route::prefix('v1')->group(function () {
         Route::post('memberships/{id}/self-unfreeze',  [MembershipController::class, 'selfUnfreeze'])->middleware('role:client');
 
         // Абонементы — управление
-        Route::prefix('memberships')->middleware('role:admin')->group(function () {
-            Route::get('/',                 [MembershipController::class, 'index']);
-            Route::post('/',                [MembershipController::class, 'store']);
-            Route::post('/{id}/freeze',     [MembershipController::class, 'freeze']);
-            Route::post('/{id}/unfreeze',   [MembershipController::class, 'unfreeze']);
-            Route::post('/{id}/cancel',     [MembershipController::class, 'cancel']);
+        Route::prefix('memberships')->group(function () {
+            Route::get('/',                 [MembershipController::class, 'index'])->middleware('role:admin,owner');
+            Route::post('/',                [MembershipController::class, 'store'])->middleware('role:admin');
+            Route::post('/{id}/freeze',     [MembershipController::class, 'freeze'])->middleware('role:admin');
+            Route::post('/{id}/unfreeze',   [MembershipController::class, 'unfreeze'])->middleware('role:admin');
+            Route::post('/{id}/cancel',     [MembershipController::class, 'cancel'])->middleware('role:admin');
         });
 
         // Записи на занятия
@@ -125,7 +125,7 @@ Route::prefix('v1')->group(function () {
 
         // Посещения
         Route::prefix('visits')->group(function () {
-            Route::get('/sessions-with-visits', [VisitController::class, 'sessionsWithVisits'])->middleware('role:admin,trainer');
+            Route::get('/sessions-with-visits', [VisitController::class, 'sessionsWithVisits'])->middleware('role:admin,trainer,owner');
             Route::post('/',      [VisitController::class, 'store'])->middleware('role:admin,trainer');
             Route::put('/{id}',   [VisitController::class, 'update'])->middleware('role:admin,trainer');
             Route::get('/',       [VisitController::class, 'index'])->middleware('role:admin,owner');

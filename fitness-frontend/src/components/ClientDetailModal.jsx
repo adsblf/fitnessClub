@@ -128,6 +128,8 @@ function ViewMode({ detail, clientId, onClose, onEdit, onDelete }) {
                 </Section>
             )}
 
+            <AllMembershipsSection clientId={clientId} />
+
             {detail.card && (
                 <Section title="Карточка тренировок">
                     <Row label="Цель" value={detail.card.training_goal ?? "—"} />
@@ -151,6 +153,8 @@ function ViewMode({ detail, clientId, onClose, onEdit, onDelete }) {
                     <div className="text-xs text-zinc-400">Активных записей</div>
                 </div>
             </div>
+
+            <VisitsHistorySection clientId={clientId} />
 
             <div className="flex gap-3">
                 <button
@@ -521,6 +525,170 @@ function Field({ label, error, hint, children }) {
             ) : hint ? (
                 <p className="text-xs text-zinc-400 mt-1">{hint}</p>
             ) : null}
+        </div>
+    );
+}
+
+// ── История абонементов (раскрывается по кнопке) ────
+const MEMBERSHIP_STATUS = {
+    active:    { label: "Активен",    cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400" },
+    frozen:    { label: "Заморожен",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400" },
+    cancelled: { label: "Отменён",    cls: "bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400" },
+    expired:   { label: "Истёк",      cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" },
+    inactive:  { label: "Неактивен",  cls: "bg-zinc-100 text-zinc-500" },
+};
+
+function AllMembershipsSection({ clientId }) {
+    const [open, setOpen]       = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [items, setItems]     = useState(null);
+
+    async function toggle() {
+        if (open) { setOpen(false); return; }
+        if (items !== null) { setOpen(true); return; } // already loaded
+        setLoading(true);
+        try {
+            const res = await clientsApi.memberships(clientId);
+            setItems(res.data.data ?? []);
+            setOpen(true);
+        } catch { setItems([]); setOpen(true); }
+        finally { setLoading(false); }
+    }
+
+    return (
+        <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide text-zinc-400">История абонементов</div>
+                <button
+                    onClick={toggle}
+                    disabled={loading}
+                    className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                >
+                    {loading ? "..." : open ? "Скрыть" : "Показать"}
+                </button>
+            </div>
+
+            {open && (
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                    {!items || items.length === 0 ? (
+                        <p className="text-xs text-zinc-400 italic p-3">Абонементов нет</p>
+                    ) : (
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="text-zinc-400 border-b border-zinc-100 dark:border-zinc-700">
+                                    <th className="text-left px-3 py-2 font-normal">Тариф</th>
+                                    <th className="text-left px-3 py-2 font-normal">Период</th>
+                                    <th className="text-left px-3 py-2 font-normal">Остаток</th>
+                                    <th className="text-left px-3 py-2 font-normal">Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map(m => (
+                                    <tr key={m.id} className="border-b border-zinc-100 dark:border-zinc-700 last:border-0">
+                                        <td className="px-3 py-2 text-zinc-800 dark:text-zinc-200 font-medium">{m.type}</td>
+                                        <td className="px-3 py-2 text-zinc-500">{m.start_date} — {m.end_date}</td>
+                                        <td className="px-3 py-2 text-zinc-500">{m.remaining_visits ?? "∞"}</td>
+                                        <td className="px-3 py-2">
+                                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${MEMBERSHIP_STATUS[m.status]?.cls ?? "bg-zinc-100 text-zinc-500"}`}>
+                                                {MEMBERSHIP_STATUS[m.status]?.label ?? m.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── История посещений (раскрывается по кнопке) ──────
+const VISIT_STATUS = {
+    present: { label: "Присутствовал", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400" },
+    absent:  { label: "Отсутствовал",  cls: "bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400" },
+    late:    { label: "Опоздал",       cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" },
+};
+
+function VisitsHistorySection({ clientId }) {
+    const [open, setOpen]       = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [items, setItems]     = useState(null);
+    const [showAll, setShowAll] = useState(false);
+
+    async function toggle() {
+        if (open) { setOpen(false); return; }
+        if (items !== null) { setOpen(true); return; }
+        setLoading(true);
+        try {
+            const res = await clientsApi.visits(clientId);
+            setItems(res.data.data ?? []);
+            setOpen(true);
+        } catch { setItems([]); setOpen(true); }
+        finally { setLoading(false); }
+    }
+
+    const PREVIEW = 10;
+    const displayed = items ? (showAll ? items : items.slice(0, PREVIEW)) : [];
+
+    return (
+        <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide text-zinc-400">История посещений</div>
+                <button
+                    onClick={toggle}
+                    disabled={loading}
+                    className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                >
+                    {loading ? "..." : open ? "Скрыть" : "Показать"}
+                </button>
+            </div>
+
+            {open && (
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                    {!items || items.length === 0 ? (
+                        <p className="text-xs text-zinc-400 italic p-3">Посещений нет</p>
+                    ) : (
+                        <>
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="text-zinc-400 border-b border-zinc-100 dark:border-zinc-700">
+                                        <th className="text-left px-3 py-2 font-normal">Дата и время</th>
+                                        <th className="text-left px-3 py-2 font-normal">Занятие</th>
+                                        <th className="text-left px-3 py-2 font-normal">Статус</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {displayed.map(v => (
+                                        <tr key={v.id} className="border-b border-zinc-100 dark:border-zinc-700 last:border-0">
+                                            <td className="px-3 py-2 text-zinc-500 whitespace-nowrap">
+                                                {new Date(v.visited_at).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}
+                                            </td>
+                                            <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">{v.session_name ?? "—"}</td>
+                                            <td className="px-3 py-2">
+                                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${VISIT_STATUS[v.status]?.cls ?? "bg-zinc-100 text-zinc-500"}`}>
+                                                    {VISIT_STATUS[v.status]?.label ?? v.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {items.length > PREVIEW && (
+                                <div className="text-center py-2 border-t border-zinc-100 dark:border-zinc-700">
+                                    <button
+                                        onClick={() => setShowAll(s => !s)}
+                                        className="text-xs text-blue-600 hover:underline"
+                                    >
+                                        {showAll ? "Свернуть" : `Показать все ${items.length} посещений`}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
