@@ -2,12 +2,13 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 
 const nav = [
-  { to: "/admin",             label: "Дашборд",     icon: "📊" },
-  { to: "/admin/clients",     label: "Клиенты",     icon: "👥" },
-  { to: "/admin/schedule",    label: "Расписание",   icon: "📅" },
-  { to: "/admin/memberships", label: "Абонементы",   icon: "🎫" },
-  { to: "/admin/visits",      label: "Посещения",    icon: "✅" },
-  { to: "/admin/pending-bookings", label: "Ожидающие записи", icon: "⏳" },
+  { to: "/admin",                   label: "Дашборд",             icon: "📊" },
+  { to: "/admin/clients",           label: "Клиенты",             icon: "👥" },
+  { to: "/admin/schedule",          label: "Расписание",          icon: "📅" },
+  { to: "/admin/memberships",       label: "Абонементы",          icon: "🎫" },
+  { to: "/admin/sales",             label: "Продажи",             icon: "💰" },
+  { to: "/admin/visits",            label: "Посещения",           icon: "✅" },
+  { to: "/admin/pending-bookings",  label: "Ожидающие записи",   icon: "⏳" },
 ];
 
 export default function AdminLayout() {

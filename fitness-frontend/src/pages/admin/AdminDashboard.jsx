@@ -186,10 +186,12 @@ export default function AdminDashboard() {
           value={`${fmt(stats.revenue_month)} ₽`}
           sub={`Прошлый месяц: ${fmt(stats.revenue_last_month)} ₽`}
           badge={revenueDelta}
+          onClick={() => navigate("/admin/sales?quick=month")}
         />
         <StatCard
           label="Выручка сегодня"
           value={`${fmt(stats.revenue_today)} ₽`}
+          onClick={() => navigate("/admin/sales?quick=today")}
         />
         <StatCard
           label="Посещений сегодня"

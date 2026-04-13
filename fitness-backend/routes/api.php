@@ -46,6 +46,9 @@ Route::prefix('v1')->group(function () {
         Route::get('bookings/pending', [DashboardController::class, 'pendingBookings'])
             ->middleware('role:admin');
 
+        Route::get('sales', [DashboardController::class, 'salesHistory'])
+            ->middleware('role:admin,owner');
+
         // Клиенты — CRUD
         Route::prefix('clients')->group(function () {
             Route::get('/search', [ClientController::class, 'search'])->middleware('role:admin,trainer');

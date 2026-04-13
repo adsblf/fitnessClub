@@ -19,6 +19,7 @@ import AdminSchedule from "./pages/admin/AdminSchedule";
 import AdminMemberships from "./pages/admin/AdminMemberships";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminPendingBookings from "./pages/admin/AdminPendingBookings";
+import AdminSales from "./pages/admin/AdminSales";
 
 // Client pages
 import ClientDashboard from "./pages/client/ClientDashboard";
@@ -90,6 +91,7 @@ export default function App() {
                             <Route path="memberships" element={<AdminMemberships />} />
                             <Route path="visits" element={<AdminVisits />} />
                             <Route path="pending-bookings" element={<AdminPendingBookings />} />
+                            <Route path="sales" element={<AdminSales />} />
                         </Route>
                     </Route>
 

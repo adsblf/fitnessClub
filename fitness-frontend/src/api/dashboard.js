@@ -4,4 +4,7 @@ export const dashboardApi = {
     index() {
         return api.get("/dashboard");
     },
+    sales(params = {}) {
+        return api.get("/sales", { params });
+    },
 };

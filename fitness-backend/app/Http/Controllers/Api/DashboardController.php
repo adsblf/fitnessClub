@@ -11,6 +11,7 @@ use App\Models\Visit;
 use App\Models\Booking;
 use App\Models\Session;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -283,6 +284,148 @@ class DashboardController extends Controller
                 'created_at'    => $b->created_at->toDateTimeString(),
                 'status'        => $b->status,
             ]),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/sales
+     * История продаж (успешные платежи) с фильтрами и агрегированной статистикой.
+     */
+    public function salesHistory(Request $request): JsonResponse
+    {
+        $dateFrom = $request->input('date_from');
+        $dateTo   = $request->input('date_to');
+        $clientId = $request->input('client_id');
+        $view     = $request->input('view', 'transactions'); // transactions | clients
+        $perPage  = min((int) $request->input('per_page', 25), 100);
+
+        // ── Базовый запрос ──────────────────────────────────────────────
+        $baseQuery = Payment::where('status', 'success');
+
+        if ($dateFrom) $baseQuery->whereDate('paid_at', '>=', $dateFrom);
+        if ($dateTo)   $baseQuery->whereDate('paid_at', '<=', $dateTo);
+        if ($clientId) $baseQuery->where('client_id', $clientId);
+
+        // ── Сводная статистика ─────────────────────────────────────────
+        $summaryQuery = clone $baseQuery;
+        $totalAmount  = (float) $summaryQuery->sum('amount');
+        $totalCount   = $summaryQuery->count();
+        $avgAmount    = $totalCount > 0 ? round($totalAmount / $totalCount, 2) : 0;
+
+        // ── Топ клиентов (для боковой панели, всегда без фильтра по клиенту) ──
+        $topClientsQuery = Payment::select(
+                'client_id',
+                DB::raw('SUM(amount) as total_amount'),
+                DB::raw('COUNT(*) as sales_count')
+            )
+            ->where('status', 'success');
+        if ($dateFrom) $topClientsQuery->whereDate('paid_at', '>=', $dateFrom);
+        if ($dateTo)   $topClientsQuery->whereDate('paid_at', '<=', $dateTo);
+
+        $topClientRows = $topClientsQuery
+            ->groupBy('client_id')
+            ->orderByDesc('total_amount')
+            ->limit(10)
+            ->get();
+
+        // Догружаем данные клиентов
+        $clientIds = $topClientRows->pluck('client_id')->all();
+        $clientMap = Client::with('person')
+            ->whereIn('person_id', $clientIds)
+            ->get()
+            ->keyBy('person_id');
+
+        $topClients = $topClientRows->map(fn ($row) => [
+            'client_id'   => $row->client_id,
+            'client_name' => $clientMap[$row->client_id]?->person?->full_name ?? 'Клиент #' . $row->client_id,
+            'total_amount'=> (float) $row->total_amount,
+            'sales_count' => (int) $row->sales_count,
+        ])->values()->all();
+
+        // ── Представление: список по клиентам ─────────────────────────
+        if ($view === 'clients') {
+            $clientsQuery = Payment::select(
+                    'client_id',
+                    DB::raw('SUM(amount) as total_amount'),
+                    DB::raw('COUNT(*) as sales_count'),
+                    DB::raw('AVG(amount) as avg_amount'),
+                    DB::raw('MAX(paid_at) as last_purchase')
+                )
+                ->where('status', 'success');
+            if ($dateFrom) $clientsQuery->whereDate('paid_at', '>=', $dateFrom);
+            if ($dateTo)   $clientsQuery->whereDate('paid_at', '<=', $dateTo);
+            if ($clientId) $clientsQuery->where('client_id', $clientId);
+
+            $paginated = $clientsQuery
+                ->groupBy('client_id')
+                ->orderByDesc('total_amount')
+                ->paginate($perPage);
+
+            $allClientIds   = $paginated->pluck('client_id')->all();
+            $allClientsMap  = Client::with('person')
+                ->whereIn('person_id', $allClientIds)
+                ->get()
+                ->keyBy('person_id');
+
+            $rows = $paginated->map(fn ($row) => [
+                'client_id'    => $row->client_id,
+                'client_name'  => $allClientsMap[$row->client_id]?->person?->full_name ?? 'Клиент #' . $row->client_id,
+                'total_amount' => (float) $row->total_amount,
+                'sales_count'  => (int) $row->sales_count,
+                'avg_amount'   => round((float) $row->avg_amount, 2),
+                'last_purchase'=> $row->last_purchase,
+            ]);
+
+            return response()->json([
+                'data'    => $rows,
+                'meta'    => [
+                    'current_page' => $paginated->currentPage(),
+                    'last_page'    => $paginated->lastPage(),
+                    'per_page'     => $paginated->perPage(),
+                    'total'        => $paginated->total(),
+                ],
+                'summary' => [
+                    'total_amount' => $totalAmount,
+                    'total_count'  => $totalCount,
+                    'avg_amount'   => $avgAmount,
+                ],
+                'top_clients' => $topClients,
+            ]);
+        }
+
+        // ── Представление: транзакции ──────────────────────────────────
+        $paginated = $baseQuery
+            ->with(['client.person', 'membership.membershipType', 'promoCode'])
+            ->orderByDesc('paid_at')
+            ->paginate($perPage);
+
+        $rows = $paginated->map(fn ($p) => [
+            'id'               => $p->id,
+            'paid_at'          => $p->paid_at?->toDateTimeString(),
+            'client_id'        => $p->client_id,
+            'client_name'      => $p->client?->person?->full_name ?? 'Клиент #' . $p->client_id,
+            'membership_type'  => $p->membership?->membershipType?->name ?? '—',
+            'membership_number'=> $p->membership?->membership_number ?? null,
+            'amount'           => (float) $p->amount,
+            'payment_method'   => $p->payment_method,
+            'promo_code'       => $p->promoCode?->code ?? null,
+            'transaction_id'   => $p->transaction_id,
+        ]);
+
+        return response()->json([
+            'data'    => $rows,
+            'meta'    => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
+            'summary' => [
+                'total_amount' => $totalAmount,
+                'total_count'  => $totalCount,
+                'avg_amount'   => $avgAmount,
+            ],
+            'top_clients' => $topClients,
         ]);
     }
 }
