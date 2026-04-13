@@ -142,6 +142,34 @@ class ScheduleController extends Controller
             }
         }
 
+        // Проверка конфликтов по клиенту (персональное занятие)
+        if (($data['type'] ?? null) === 'personal' && isset($data['client_id'])) {
+            // Уже является участником персонального занятия в это время?
+            $personalConflict = Session::whereHas('personalSession', function ($q) use ($data) {
+                    $q->where('client_id', $data['client_id']);
+                })
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($data) {
+                    $q->where('starts_at', '<', $data['ends_at'])
+                        ->where('ends_at', '>', $data['starts_at']);
+                })->exists();
+
+            // Уже записан на групповое занятие в это время?
+            $bookingConflict = Booking::where('client_id', $data['client_id'])
+                ->whereIn('status', ['pending', 'confirmed'])
+                ->whereHas('session', function ($q) use ($data) {
+                    $q->where('status', '!=', 'cancelled')
+                        ->where('starts_at', '<', $data['ends_at'])
+                        ->where('ends_at', '>', $data['starts_at']);
+                })->exists();
+
+            if ($personalConflict || $bookingConflict) {
+                return response()->json([
+                    'message' => 'У клиента уже есть занятие в это время',
+                ], 409);
+            }
+        }
+
         // Создаём базовое занятие
         $session = Session::create([
             'hall_id'    => $data['hall_id'] ?? null,
@@ -200,6 +228,11 @@ class ScheduleController extends Controller
                 'difficulty_level' => $data['difficulty_level'] ?? null,
                 'max_participants' => $data['max_participants'] ?? null,
             ], fn ($v) => $v !== null));
+        }
+
+        // Обновить клиента если персональное
+        if ($session->type === 'personal' && isset($data['client_id']) && $session->personalSession) {
+            $session->personalSession->update(['client_id' => $data['client_id']]);
         }
 
         $session->load(['hall', 'trainer.person', 'groupSession', 'personalSession.client.person']);

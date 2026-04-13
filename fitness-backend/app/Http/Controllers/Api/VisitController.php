@@ -113,14 +113,34 @@ class VisitController extends Controller
         $query = Visit::with(['client.person', 'session.groupSession'])
             ->orderByDesc('visited_at');
 
-        // Фильтр по дате
+        // Фильтр только свободных посещений (без сессии — Быстрая регистрация)
+        if ($request->query('free_only')) {
+            $query->whereNull('session_id');
+        }
+
+        // Фильтр по дате (одна дата)
         if ($date = $request->query('date')) {
             $query->whereDate('visited_at', $date);
+        }
+
+        // Фильтр по диапазону дат
+        if ($fromDate = $request->query('from_date')) {
+            $query->whereDate('visited_at', '>=', $fromDate);
+        }
+        if ($toDate = $request->query('to_date')) {
+            $query->whereDate('visited_at', '<=', $toDate);
         }
 
         // Фильтр по клиенту
         if ($clientId = $request->query('client_id')) {
             $query->where('client_id', $clientId);
+        }
+
+        // Поиск по имени клиента
+        if ($search = $request->query('search')) {
+            $query->whereHas('client.person', function ($q) use ($search) {
+                $q->where('full_name', 'like', '%' . $search . '%');
+            });
         }
 
         $perPage = $request->query('per_page', 20);
@@ -177,6 +197,7 @@ class VisitController extends Controller
             'hall',
             'trainer.person',
             'groupSession',
+            'personalSession.client.person',
             'bookings' => function ($q) {
                 $q->where('status', 'confirmed')->with(['client.person']);
             },
@@ -215,17 +236,28 @@ class VisitController extends Controller
 
     private function formatSessionWithVisits(Session $session): array
     {
-        return [
-            'id' => $session->id,
-            'hall_name' => $session->hall->name ?? 'Зал',
-            'trainer_name' => $session->trainer?->person->full_name ?? 'Без тренера',
-            'session_name' => $session->groupSession?->name ?? 'Персональное занятие',
-            'starts_at' => $session->starts_at->toDateTimeString(),
-            'ends_at' => $session->ends_at->toDateTimeString(),
-            'type' => $session->type,
-            'is_editable' => $session->isEditable(),
+        $data = [
+            'id'               => $session->id,
+            'hall_name'        => $session->hall ? ('Зал ' . $session->hall->number) : 'Зал',
+            'trainer_name'     => $session->trainer?->person->full_name ?? 'Без тренера',
+            'session_name'     => $session->groupSession?->name ?? 'Персональное занятие',
+            'starts_at'        => $session->starts_at->toDateTimeString(),
+            'ends_at'          => $session->ends_at->toDateTimeString(),
+            'type'             => $session->type,
+            'status'           => $session->status,
+            'is_editable'      => $session->isEditable(),
             'max_participants' => $session->groupSession?->max_participants,
-            'participants' => $session->getParticipantsInfo(),
+            'participants'     => $session->getParticipantsInfo(),
         ];
+
+        if ($session->type === 'personal' && $session->personalSession) {
+            $ps = $session->personalSession;
+            $data['personal_client'] = [
+                'id'        => $ps->client_id,
+                'full_name' => $ps->client->person->full_name ?? null,
+            ];
+        }
+
+        return $data;
     }
 }

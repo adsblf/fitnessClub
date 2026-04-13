@@ -59,16 +59,16 @@ export default function AdminVisits() {
 
 function GroupSessionsTab() {
   const [sessions, setSessions] = useState([]);
-  const [meta, setMeta] = useState({});
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [subTab, setSubTab] = useState("current"); // 'current' или 'archive'
 
   const fetch = useCallback(
-    (page = 1) => {
+    () => {
       setLoading(true);
-      const params = { page, per_page: 20 };
+      const params = { per_page: 1000 };
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
 
@@ -80,7 +80,6 @@ function GroupSessionsTab() {
             s.type === 'group' && s.status !== 'cancelled'
           );
           setSessions(groupSessions);
-          setMeta(r.data.meta);
         })
         .catch((err) => {
           console.error("Ошибка при загрузке сессий:", err);
@@ -92,10 +91,13 @@ function GroupSessionsTab() {
   );
 
   useEffect(() => {
-    fetch(1);
+    fetch();
   }, [fetch]);
 
+  useEffect(() => { setPage(1); }, [subTab]);
+
   // Фильтруем сессии по архиву/текущим
+  const PAGE_SIZE = 25;
   const now = new Date();
   const filteredSessions = sessions.filter(session => {
     const sessionEnd = new Date(session.ends_at);
@@ -110,6 +112,8 @@ function GroupSessionsTab() {
       return now >= archiveTime;
     }
   });
+  const totalPages = Math.ceil(filteredSessions.length / PAGE_SIZE);
+  const paginatedSessions = filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const setTodayRange = () => {
     const today = todayStr();
@@ -221,25 +225,25 @@ function GroupSessionsTab() {
               : "Архив групповых тренировок пуст"}
           </div>
         ) : (
-          filteredSessions.map((session) => (
+          paginatedSessions.map((session) => (
             <SessionVisitBlock
               key={session.id}
               session={session}
-              onUpdated={() => fetch(meta.current_page || 1)}
+              onUpdated={fetch}
             />
           ))
         )}
       </div>
 
       {/* Пагинация */}
-      {meta.last_page > 1 && (
+      {totalPages > 1 && (
         <div className="flex justify-center gap-2 p-4">
-          {Array.from({ length: meta.last_page }, (_, i) => (
+          {Array.from({ length: totalPages }, (_, i) => (
             <button
               key={i + 1}
-              onClick={() => fetch(i + 1)}
+              onClick={() => setPage(i + 1)}
               className={`px-3 py-1 rounded text-xs ${
-                meta.current_page === i + 1
+                page === i + 1
                   ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                   : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               }`}
@@ -255,16 +259,16 @@ function GroupSessionsTab() {
 
 function PersonalSessionsTab() {
   const [sessions, setSessions] = useState([]);
-  const [meta, setMeta] = useState({});
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [subTab, setSubTab] = useState("current"); // 'current' или 'archive'
 
   const fetch = useCallback(
-    (page = 1) => {
+    () => {
       setLoading(true);
-      const params = { page, per_page: 20 };
+      const params = { per_page: 1000 };
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
 
@@ -276,7 +280,6 @@ function PersonalSessionsTab() {
             s.type === 'personal' && s.status !== 'cancelled'
           );
           setSessions(personalSessions);
-          setMeta(r.data.meta);
         })
         .catch((err) => {
           console.error("Ошибка при загрузке сессий:", err);
@@ -288,10 +291,13 @@ function PersonalSessionsTab() {
   );
 
   useEffect(() => {
-    fetch(1);
+    fetch();
   }, [fetch]);
 
+  useEffect(() => { setPage(1); }, [subTab]);
+
   // Фильтруем сессии по архиву/текущим
+  const PAGE_SIZE = 25;
   const now = new Date();
   const filteredSessions = sessions.filter(session => {
     const sessionEnd = new Date(session.ends_at);
@@ -306,6 +312,8 @@ function PersonalSessionsTab() {
       return now >= archiveTime;
     }
   });
+  const totalPages = Math.ceil(filteredSessions.length / PAGE_SIZE);
+  const paginatedSessions = filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const setTodayRange = () => {
     const today = todayStr();
@@ -417,25 +425,25 @@ function PersonalSessionsTab() {
               : "Архив персональных тренировок пуст"}
           </div>
         ) : (
-          filteredSessions.map((session) => (
+          paginatedSessions.map((session) => (
             <SessionVisitBlock
               key={session.id}
               session={session}
-              onUpdated={() => fetch(meta.current_page || 1)}
+              onUpdated={fetch}
             />
           ))
         )}
       </div>
 
       {/* Пагинация */}
-      {meta.last_page > 1 && (
+      {totalPages > 1 && (
         <div className="flex justify-center gap-2 p-4">
-          {Array.from({ length: meta.last_page }, (_, i) => (
+          {Array.from({ length: totalPages }, (_, i) => (
             <button
               key={i + 1}
-              onClick={() => fetch(i + 1)}
+              onClick={() => setPage(i + 1)}
               className={`px-3 py-1 rounded text-xs ${
-                meta.current_page === i + 1
+                page === i + 1
                   ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                   : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               }`}

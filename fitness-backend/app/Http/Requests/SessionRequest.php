@@ -24,6 +24,7 @@ class SessionRequest extends FormRequest
                 'name'             => 'sometimes|string|max:100',
                 'difficulty_level' => 'nullable|string|max:50',
                 'max_participants' => 'sometimes|integer|min:1',
+                'client_id'        => 'sometimes|exists:clients,person_id',
             ];
         }
 

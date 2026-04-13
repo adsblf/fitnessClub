@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Membership;
+use App\Models\MembershipType;
 use App\Models\Payment;
 use App\Models\Visit;
 use App\Models\Booking;
+use App\Models\Session;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -72,8 +75,168 @@ class DashboardController extends Controller
 
                 // Ожидающих подтверждения записей (после очистки прошедших)
                 'pending_bookings_count' => Booking::where('status', 'pending')->count(),
+
+                // ── Графики: посещения по дням (30 дней) ──
+                'visits_per_day' => $this->visitsPerDay(30),
+
+                // ── Графики: выручка по дням (30 дней) ──
+                'revenue_per_day' => $this->revenuePerDay(30),
+
+                // ── Статусы абонементов ──
+                'membership_status_breakdown' => $this->membershipStatusBreakdown(),
+
+                // ── Разбивка по типам абонементов ──
+                'membership_type_breakdown' => $this->membershipTypeBreakdown(),
+
+                // ── Посещения по типам ──
+                'visits_by_type' => $this->visitsByType(),
+
+                // ── Топ-5 тренеров по посещениям за месяц ──
+                'top_trainers' => $this->topTrainers($monthStart),
+
+                // ── Новые клиенты по дням (30 дней) ──
+                'new_clients_per_day' => $this->newClientsPerDay(30),
+
+                // ── Процент заполняемости занятий (топ-5 за месяц) ──
+                'top_sessions_attendance' => $this->topSessionsAttendance($monthStart),
+
+                // ── Посещений за прошлый месяц (для сравнения) ──
+                'visits_last_month' => Visit::whereDate('visited_at', '>=', now()->subMonth()->startOfMonth()->toDateString())
+                    ->whereDate('visited_at', '<', $monthStart)
+                    ->count(),
+
+                // ── Выручка за прошлый месяц ──
+                'revenue_last_month' => Payment::whereDate('paid_at', '>=', now()->subMonth()->startOfMonth()->toDateString())
+                    ->whereDate('paid_at', '<', $monthStart)
+                    ->where('status', 'success')
+                    ->sum('amount'),
             ],
         ]);
+    }
+
+    // ── Private analytics helpers ─────────────────────────────────────────
+
+    private function visitsPerDay(int $days): array
+    {
+        $result = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->toDateString();
+            $result[] = [
+                'date'  => $date,
+                'count' => Visit::whereDate('visited_at', $date)->count(),
+            ];
+        }
+        return $result;
+    }
+
+    private function revenuePerDay(int $days): array
+    {
+        $result = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->toDateString();
+            $result[] = [
+                'date'   => $date,
+                'amount' => (float) Payment::whereDate('paid_at', $date)
+                    ->where('status', 'success')
+                    ->sum('amount'),
+            ];
+        }
+        return $result;
+    }
+
+    private function membershipStatusBreakdown(): array
+    {
+        $statuses = ['active', 'frozen', 'expired', 'cancelled'];
+        $result = [];
+        foreach ($statuses as $status) {
+            $result[] = [
+                'status' => $status,
+                'count'  => Membership::where('status', $status)->count(),
+            ];
+        }
+        return $result;
+    }
+
+    private function membershipTypeBreakdown(): array
+    {
+        return MembershipType::withCount(['memberships' => function ($q) {
+                $q->where('status', 'active');
+            }])
+            ->get()
+            ->map(fn($t) => [
+                'name'  => $t->name,
+                'count' => $t->memberships_count,
+            ])
+            ->toArray();
+    }
+
+    private function visitsByType(): array
+    {
+        $free      = Visit::whereNull('session_id')->count();
+        $group     = Visit::whereHas('session', fn($q) => $q->where('type', 'group'))->count();
+        $personal  = Visit::whereHas('session', fn($q) => $q->where('type', 'personal'))->count();
+
+        return [
+            ['type' => 'Свободное', 'count' => $free],
+            ['type' => 'Групповое', 'count' => $group],
+            ['type' => 'Персональное', 'count' => $personal],
+        ];
+    }
+
+    private function topTrainers(string $monthStart): array
+    {
+        return \App\Models\Trainer::with('person')
+            ->withCount(['sessions' => function ($q) use ($monthStart) {
+                $q->where('status', 'completed')
+                  ->whereDate('starts_at', '>=', $monthStart);
+            }])
+            ->orderByDesc('sessions_count')
+            ->limit(5)
+            ->get()
+            ->map(fn($t) => [
+                'name'           => $t->person->full_name ?? 'Тренер #' . $t->person_id,
+                'sessions_count' => $t->sessions_count,
+            ])
+            ->toArray();
+    }
+
+    private function newClientsPerDay(int $days): array
+    {
+        $result = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->toDateString();
+            $result[] = [
+                'date'  => $date,
+                'count' => Client::whereDate('registration_date', $date)->count(),
+            ];
+        }
+        return $result;
+    }
+
+    private function topSessionsAttendance(string $monthStart): array
+    {
+        return Session::with('groupSession')
+            ->where('type', 'group')
+            ->whereDate('starts_at', '>=', $monthStart)
+            ->where('status', 'completed')
+            ->withCount(['visits'])
+            ->orderByDesc('visits_count')
+            ->limit(20)
+            ->get()
+            ->filter(fn($s) => $s->visits_count > 0)
+            ->take(5)
+            ->map(fn($s) => [
+                'name'     => $s->groupSession->name ?? 'Занятие #' . $s->id,
+                'date'     => $s->starts_at->toDateString(),
+                'time'     => $s->starts_at->format('H:i'),
+                'visits'   => $s->visits_count,
+                'capacity' => $s->groupSession->max_participants ?? 0,
+                'percent'  => ($s->groupSession->max_participants ?? 0) > 0
+                    ? round($s->visits_count / $s->groupSession->max_participants * 100)
+                    : 0,
+            ])
+            ->values()
+            ->toArray();
     }
 
     /**

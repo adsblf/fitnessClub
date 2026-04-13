@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { scheduleApi } from "../../api/schedule";
+import ClientSearchAutocomplete from "../../components/ClientSearchAutocomplete";
+
+// Возвращает true, если занятие s пересекается по времени с [startsAt, endsAt]
+function timeOverlap(s, startsAt, endsAt, excludeId = null) {
+  if (s.id === excludeId) return false;
+  if (s.status === "cancelled") return false;
+  const sStart = new Date(s.starts_at.replace(" ", "T"));
+  const sEnd   = new Date(s.ends_at.replace(" ", "T"));
+  const nStart = new Date(startsAt);
+  const nEnd   = new Date(endsAt);
+  return sStart < nEnd && sEnd > nStart;
+}
 
 const STATUS_MAP = {
   scheduled:   { label: "Запланировано", cls: "bg-blue-100 text-blue-700" },
@@ -18,7 +30,8 @@ export default function AdminSchedule() {
     date: "",
     trainer_id: "",
     hall_id: "",
-    sort_slots: "", // "" | "desc" | "asc"
+    sort_slots: "",
+    hide_cancelled: true,
   });
 
   const [showCreate, setShowCreate] = useState(false);
@@ -76,7 +89,12 @@ export default function AdminSchedule() {
   }
 
   const filtersActive =
-      filters.date || filters.trainer_id || filters.hall_id || filters.sort_slots;
+      filters.date || filters.trainer_id || filters.hall_id || filters.sort_slots || !filters.hide_cancelled;
+
+  // Применить hide_cancelled на стороне клиента (данные уже загружены)
+  const visibleSessions = filters.hide_cancelled
+    ? sessions.filter((s) => s.status !== "cancelled")
+    : sessions;
 
   return (
       <div className="p-6 space-y-4">
@@ -151,19 +169,30 @@ export default function AdminSchedule() {
 
           {filtersActive && (
               <button
-                  onClick={() => setFilters({ date: "", trainer_id: "", hall_id: "", sort_slots: "" })}
+                  onClick={() => setFilters({ date: "", trainer_id: "", hall_id: "", sort_slots: "", hide_cancelled: true })}
                   className="mt-3 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
               >
                 Сбросить все фильтры
               </button>
           )}
+
+          {/* Скрыть отменённые */}
+          <label className="mt-3 flex items-center gap-2 cursor-pointer select-none w-fit">
+            <input
+              type="checkbox"
+              checked={filters.hide_cancelled}
+              onChange={(e) => setFilters({ ...filters, hide_cancelled: e.target.checked })}
+              className="w-4 h-4 rounded border-zinc-300 accent-zinc-700"
+            />
+            <span className="text-xs text-zinc-500">Скрыть отменённые</span>
+          </label>
         </div>
 
         {/* Таблица */}
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
           {loading ? (
               <div className="p-8 text-center text-sm text-zinc-400">Загрузка...</div>
-          ) : sessions.length === 0 ? (
+          ) : visibleSessions.length === 0 ? (
               <div className="p-8 text-center text-sm text-zinc-400">Занятий не найдено</div>
           ) : (
               <table className="w-full text-sm">
@@ -175,13 +204,13 @@ export default function AdminSchedule() {
                   <th className="text-left px-5 py-2.5 font-normal">Время</th>
                   <th className="text-left px-5 py-2.5 font-normal">Тренер</th>
                   <th className="text-left px-5 py-2.5 font-normal">Зал</th>
-                  <th className="text-left px-5 py-2.5 font-normal">Свободно</th>
+                  <th className="text-left px-5 py-2.5 font-normal">Свободно / Клиент</th>
                   <th className="text-left px-5 py-2.5 font-normal">Статус</th>
                   <th className="px-5 py-2.5 font-normal"></th>
                 </tr>
                 </thead>
                 <tbody>
-                {sessions.map((s, i) => {
+                {visibleSessions.map((s, i) => {
                   const st = STATUS_MAP[s.status] ?? { label: s.status, cls: "bg-zinc-100 text-zinc-600" };
                   const isGroup = s.type === "group";
                   return (
@@ -217,7 +246,7 @@ export default function AdminSchedule() {
                           {s.registered}/{s.max_participants}
                         </span>
                           ) : (
-                              "—"
+                              s.client?.full_name ?? "—"
                           )}
                         </td>
                         <td className="px-5 py-3">
@@ -287,20 +316,53 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
     trainer_id: "",
     max_participants: 15,
     difficulty_level: "Начальный",
-    client_id: "",
   });
+  const [selectedClient, setSelectedClient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [conflicts, setConflicts] = useState([]);
+
+  // Проверка конфликтов по залу, тренеру и клиенту в реальном времени
+  useEffect(() => {
+    if (!form.starts_at || !form.ends_at) {
+      setConflicts([]);
+      return;
+    }
+    const date = form.starts_at.slice(0, 10);
+    scheduleApi
+      .list({ date })
+      .then((r) => {
+        const msgs = [];
+        r.data.data.forEach((s) => {
+          if (!timeOverlap(s, form.starts_at, form.ends_at)) return;
+          if (form.hall_id && s.hall?.id === Number(form.hall_id)) {
+            msgs.push(`⚠ Зал ${s.hall.number} занят ${s.time_start}–${s.time_end} (${s.name ?? "Персональная"})`);
+          }
+          if (form.trainer_id && s.trainer?.id === Number(form.trainer_id)) {
+            msgs.push(`⚠ Тренер занят ${s.time_start}–${s.time_end} (${s.name ?? "Персональная"})`);
+          }
+          if (selectedClient && s.type === "personal" && s.client?.id === selectedClient.person_id) {
+            msgs.push(`⚠ Клиент уже записан на персональную тренировку ${s.time_start}–${s.time_end}`);
+          }
+        });
+        setConflicts(msgs);
+      })
+      .catch(() => {});
+  }, [form.starts_at, form.ends_at, form.hall_id, form.trainer_id, selectedClient]);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (form.type === "personal" && !selectedClient) {
+      setError("Выберите клиента");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data = { ...form };
       if (data.hall_id) data.hall_id = Number(data.hall_id);
       if (data.trainer_id) data.trainer_id = Number(data.trainer_id);
-      if (data.client_id) data.client_id = Number(data.client_id);
+      if (form.type === "personal") data.client_id = selectedClient.person_id;
       data.max_participants = Number(data.max_participants);
       await scheduleApi.create(data);
       onCreated();
@@ -323,6 +385,13 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
         >
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Новое занятие</h2>
           {error && <div className="text-sm text-red-500 mb-3">{error}</div>}
+          {conflicts.length > 0 && (
+            <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-1">
+              {conflicts.map((c, i) => (
+                <div key={i} className="text-xs text-amber-800 dark:text-amber-300">{c}</div>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -357,7 +426,23 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
             )}
 
             {form.type === "personal" && (
-                <InputField label="ID клиента" type="number" required value={form.client_id} onChange={set("client_id")} />
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Клиент</label>
+                <ClientSearchAutocomplete
+                  onSelect={setSelectedClient}
+                  placeholder="Поиск по ФИО..."
+                />
+                {selectedClient && (
+                  <div className="mt-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 text-sm">
+                    <span className="font-medium text-emerald-900 dark:text-emerald-100">{selectedClient.full_name}</span>
+                    {selectedClient.active_membership && (
+                      <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">
+                        {selectedClient.remaining_visits} визитов
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             <InputField label="Начало (дата и время)" type="datetime-local" required value={form.starts_at} onChange={set("starts_at")} />
@@ -368,7 +453,11 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
               <select
                   value={form.hall_id}
                   onChange={set("hall_id")}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  className={`w-full px-3 py-2 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 ${
+                    conflicts.some((c) => c.includes("Зал"))
+                      ? "border-amber-400 dark:border-amber-600"
+                      : "border-zinc-200 dark:border-zinc-700"
+                  }`}
               >
                 <option value="">— Не выбран —</option>
                 {halls.map((h) => (
@@ -384,7 +473,11 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
               <select
                   value={form.trainer_id}
                   onChange={set("trainer_id")}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  className={`w-full px-3 py-2 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 ${
+                    conflicts.some((c) => c.includes("Тренер"))
+                      ? "border-amber-400 dark:border-amber-600"
+                      : "border-zinc-200 dark:border-zinc-700"
+                  }`}
               >
                 <option value="">— Не выбран —</option>
                 {trainers.map((t) => (
@@ -443,8 +536,41 @@ function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
     difficulty_level: session.difficulty_level ?? 'Начальный',
     notes:            session.notes ?? '',
   });
+  // Для персонального занятия — текущий клиент и возможность менять
+  const [selectedClient, setSelectedClient] = useState(
+    session.client ? { person_id: session.client.id, full_name: session.client.full_name } : null
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [conflicts, setConflicts] = useState([]);
+
+  // Проверка конфликтов по залу и тренеру в реальном времени
+  useEffect(() => {
+    if (!form.starts_at || !form.ends_at) {
+      setConflicts([]);
+      return;
+    }
+    const date = form.starts_at.slice(0, 10);
+    scheduleApi
+      .list({ date })
+      .then((r) => {
+        const msgs = [];
+        r.data.data.forEach((s) => {
+          if (!timeOverlap(s, form.starts_at, form.ends_at, session.id)) return;
+          if (form.hall_id && s.hall?.id === Number(form.hall_id)) {
+            msgs.push(`⚠ Зал ${s.hall.number} занят ${s.time_start}–${s.time_end} (${s.name ?? 'Персональная'})`);
+          }
+          if (form.trainer_id && s.trainer?.id === Number(form.trainer_id)) {
+            msgs.push(`⚠ Тренер занят ${s.time_start}–${s.time_end} (${s.name ?? 'Персональная'})`);
+          }
+          if (selectedClient && s.type === 'personal' && s.client?.id === selectedClient.person_id) {
+            msgs.push(`⚠ Клиент уже записан на персональную тренировку ${s.time_start}–${s.time_end}`);
+          }
+        });
+        setConflicts(msgs);
+      })
+      .catch(() => {});
+  }, [form.starts_at, form.ends_at, form.hall_id, form.trainer_id, selectedClient, session.id]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -461,6 +587,9 @@ function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
         if (form.name)             data.name             = form.name;
         if (form.max_participants) data.max_participants = Number(form.max_participants);
         if (form.difficulty_level) data.difficulty_level = form.difficulty_level;
+      }
+      if (session.type === 'personal' && selectedClient) {
+        data.client_id = selectedClient.person_id;
       }
       await scheduleApi.update(session.id, data);
       onSaved();
@@ -486,6 +615,13 @@ function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
             {session.type === 'group' ? 'Групповое' : 'Персональное'} · {session.date}
           </p>
           {error && <div className="text-sm text-red-500 mb-3">{error}</div>}
+          {conflicts.length > 0 && (
+            <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-1">
+              {conflicts.map((c, i) => (
+                <div key={i} className="text-xs text-amber-800 dark:text-amber-300">{c}</div>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
             {session.type === 'group' && (
@@ -507,6 +643,26 @@ function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
                 </>
             )}
 
+            {session.type === 'personal' && (
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Клиент</label>
+                <ClientSearchAutocomplete
+                  onSelect={setSelectedClient}
+                  placeholder="Поиск по ФИО..."
+                />
+                {selectedClient && (
+                  <div className="mt-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 text-sm">
+                    <span className="font-medium text-emerald-900 dark:text-emerald-100">{selectedClient.full_name}</span>
+                    {selectedClient.remaining_visits !== undefined && (
+                      <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">
+                        {selectedClient.remaining_visits} визитов
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <InputField label="Начало" type="datetime-local" value={form.starts_at} onChange={set('starts_at')} />
             <InputField label="Окончание" type="datetime-local" value={form.ends_at} onChange={set('ends_at')} />
 
@@ -515,7 +671,11 @@ function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
               <select
                   value={form.hall_id}
                   onChange={set('hall_id')}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  className={`w-full px-3 py-2 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 ${
+                    conflicts.some((c) => c.includes('Зал'))
+                      ? 'border-amber-400 dark:border-amber-600'
+                      : 'border-zinc-200 dark:border-zinc-700'
+                  }`}
               >
                 <option value="">— Не выбран —</option>
                 {halls.map((h) => (
@@ -529,7 +689,11 @@ function EditSessionModal({ session, halls, trainers, onClose, onSaved }) {
               <select
                   value={form.trainer_id}
                   onChange={set('trainer_id')}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  className={`w-full px-3 py-2 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 ${
+                    conflicts.some((c) => c.includes('Тренер'))
+                      ? 'border-amber-400 dark:border-amber-600'
+                      : 'border-zinc-200 dark:border-zinc-700'
+                  }`}
               >
                 <option value="">— Не выбран —</option>
                 {trainers.map((t) => (

@@ -47,7 +47,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
   /* ── Открыть режим редактирования ───────────────── */
   const startEditing = () => {
     const init = {};
-    session.participants.forEach((p) => { init[p.client_id] = p.status; });
+    effectiveParticipants.forEach((p) => { init[p.client_id] = p.status; });
     setLocalStatuses(init);
     setEditingState("editing");
     setShowAddClient(false);
@@ -64,7 +64,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
     setSaving(true);
     setSaveError(null);
     try {
-      const toSave = session.participants.filter((p) => {
+      const toSave = effectiveParticipants.filter((p) => {
         const ns = localStatuses[p.client_id];
         return ns && ns !== p.status && ["visited", "no_show", "late"].includes(ns);
       });
@@ -116,6 +116,17 @@ export default function SessionVisitBlock({ session, onUpdated }) {
     }
   };
 
+  // Для персональных занятий — добавляем клиента в список участников если его ещё нет
+  const effectiveParticipants = (() => {
+    if (session.type !== 'personal' || !session.personal_client) return session.participants;
+    const already = session.participants.some(p => p.client_id === session.personal_client.id);
+    if (already) return session.participants;
+    return [
+      { client_id: session.personal_client.id, client_name: session.personal_client.full_name, status: 'confirmed', visit_id: null },
+      ...session.participants,
+    ];
+  })();
+
   const isSessionStarted = session.is_editable; // now >= starts_at (server-side)
   const showActionCol = editingState === "editing";
 
@@ -161,12 +172,12 @@ export default function SessionVisitBlock({ session, onUpdated }) {
             </tr>
           </thead>
           <tbody>
-            {session.participants.length === 0 ? (
+            {effectiveParticipants.length === 0 ? (
               <tr>
                 <td colSpan={showActionCol ? 3 : 2} className="px-5 py-4 text-center text-zinc-400">Нет записей</td>
               </tr>
             ) : (
-              session.participants.map((participant, idx) => {
+              effectiveParticipants.map((participant, idx) => {
                 const displayStatus = editingState === "editing"
                   ? (localStatuses[participant.client_id] ?? participant.status)
                   : participant.status;

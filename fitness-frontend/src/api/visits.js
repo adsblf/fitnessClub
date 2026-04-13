@@ -10,6 +10,9 @@ export const visitsApi = {
     list(params = {}) {
         return api.get("/visits", { params });
     },
+    listFree(params = {}) {
+        return api.get("/visits", { params: { ...params, free_only: 1 } });
+    },
     sessionsWithVisits(params = {}) {
         return api.get("/visits/sessions-with-visits", { params });
     },
