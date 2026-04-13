@@ -89,11 +89,19 @@ Route::prefix('v1')->group(function () {
         // Типы абонементов (справочник)
         Route::get('membership-types', [MembershipController::class, 'types']);
 
+        // Расчёт цены доступен админу и клиенту
+        Route::post('memberships/calculate-price', [MembershipController::class, 'calculatePrice'])
+            ->middleware('role:admin,client');
+
+        // Клиентские маршруты управления абонементом
+        Route::post('memberships/self-renew',          [MembershipController::class, 'selfRenew'])->middleware('role:client');
+        Route::post('memberships/{id}/self-freeze',    [MembershipController::class, 'selfFreeze'])->middleware('role:client');
+        Route::post('memberships/{id}/self-unfreeze',  [MembershipController::class, 'selfUnfreeze'])->middleware('role:client');
+
         // Абонементы — управление
         Route::prefix('memberships')->middleware('role:admin')->group(function () {
             Route::get('/',                 [MembershipController::class, 'index']);
             Route::post('/',                [MembershipController::class, 'store']);
-            Route::post('/calculate-price', [MembershipController::class, 'calculatePrice']);
             Route::post('/{id}/freeze',     [MembershipController::class, 'freeze']);
             Route::post('/{id}/unfreeze',   [MembershipController::class, 'unfreeze']);
             Route::post('/{id}/cancel',     [MembershipController::class, 'cancel']);

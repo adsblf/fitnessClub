@@ -2,10 +2,11 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 
 const nav = [
-  { to: "/client",           label: "Главная",    icon: "🏠" },
-  { to: "/client/schedule",  label: "Расписание", icon: "📅" },
-  { to: "/client/bookings",  label: "Мои записи", icon: "🎫" },
-  { to: "/client/profile",   label: "Профиль",    icon: "👤" },
+  { to: "/client",            label: "Главная",    icon: "🏠" },
+  { to: "/client/schedule",   label: "Расписание", icon: "📅" },
+  { to: "/client/bookings",   label: "Мои записи", icon: "🎫" },
+  { to: "/client/membership", label: "Абонемент",  icon: "💳" },
+  { to: "/client/profile",    label: "Профиль",    icon: "👤" },
 ];
 
 export default function ClientLayout() {

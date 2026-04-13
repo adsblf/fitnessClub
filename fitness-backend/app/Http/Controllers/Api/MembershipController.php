@@ -290,7 +290,7 @@ class MembershipController extends Controller
             'success' => 'required|boolean',
         ]);
 
-        $payment = Payment::with(['membership.client.person.user'])->findOrFail($id);
+        $payment = Payment::with(['membership.membershipType', 'membership.client.person.user'])->findOrFail($id);
 
         if ($payment->status !== 'pending') {
             return response()->json([
@@ -307,18 +307,39 @@ class MembershipController extends Controller
         $credentials = null;
 
         if ($data['success']) {
-            // Успех: активируем абонемент, фиксируем платёж, отмечаем промокод, выдаём credentials
+            // Успех: фиксируем платёж, отмечаем промокод
             $payment->update(['status' => 'success', 'paid_at' => now()]);
-            $membership->update(['status' => 'active']);
+
+            if ($membership->is_renewal) {
+                // Продление: ищем действующий или замороженный абонемент клиента
+                $existing = Membership::where('client_id', $membership->client_id)
+                    ->where('id', '!=', $membership->id)
+                    ->whereIn('status', ['active', 'frozen'])
+                    ->first();
+
+                if ($existing) {
+                    $type = $membership->membershipType;
+                    $existing->update([
+                        'end_date'         => $existing->end_date->addDays($type->duration_days),
+                        'remaining_visits' => $existing->remaining_visits + $type->visit_limit,
+                    ]);
+                    $membership->update(['status' => 'cancelled']);
+                } else {
+                    // Нет действующего — активируем новый
+                    $membership->update(['status' => 'active']);
+                }
+            } else {
+                $membership->update(['status' => 'active']);
+            }
 
             if ($payment->promo_code_id) {
                 PromoCode::find($payment->promo_code_id)?->markUsed();
             }
 
-            // credentials — только для не-разовых абонементов
+            // credentials — только для не-разовых не-продлением абонементов
             $type = $membership->membershipType;
             $isTrial = $this->isTrialType($type);
-            if (!$isTrial) {
+            if (!$isTrial && !$membership->is_renewal) {
                 $client = $membership->client;
                 $credentials = $this->generateCredentialsFor($client);
             }
@@ -395,6 +416,171 @@ class MembershipController extends Controller
     }
 
     /**
+     * POST /api/v1/memberships/{id}/self-freeze
+     * Клиент самостоятельно замораживает свой абонемент (не более 1 раза).
+     * Срок действия автоматически продлевается на период заморозки.
+     */
+    public function selfFreeze(Request $request, int $id): JsonResponse
+    {
+        $client = auth()->user()->person?->client ?? null;
+        if (!$client) {
+            return response()->json(['message' => 'Клиент не найден'], 404);
+        }
+
+        $membership = Membership::findOrFail($id);
+
+        if ((int) $membership->client_id !== (int) $client->person_id) {
+            return response()->json(['message' => 'Доступ запрещён'], 403);
+        }
+
+        if ($membership->status !== 'active') {
+            return response()->json(['message' => 'Можно заморозить только активный абонемент'], 409);
+        }
+
+        if ($membership->has_been_frozen) {
+            return response()->json([
+                'message' => 'Абонемент уже был заморожен. Заморозка возможна только 1 раз за срок действия абонемента',
+            ], 409);
+        }
+
+        $days = (int) $request->input('days', 14);
+        if (!in_array($days, [7, 14, 30])) {
+            $days = 14;
+        }
+
+        $until = now()->addDays($days);
+        $membership->update([
+            'status'          => 'frozen',
+            'frozen_until'    => $until,
+            'has_been_frozen' => true,
+            'end_date'        => $membership->end_date->addDays($days),
+        ]);
+
+        return response()->json([
+            'message' => "Абонемент заморожен до {$until->format('d.m.Y')}. Срок действия продлён на {$days} дн.",
+            'data'    => $this->formatMembership($membership->fresh(['client.person', 'membershipType'])),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/memberships/{id}/self-unfreeze
+     * Клиент самостоятельно размораживает свой абонемент досрочно.
+     */
+    public function selfUnfreeze(int $id): JsonResponse
+    {
+        $client = auth()->user()->person?->client ?? null;
+        if (!$client) {
+            return response()->json(['message' => 'Клиент не найден'], 404);
+        }
+
+        $membership = Membership::findOrFail($id);
+
+        if ((int) $membership->client_id !== (int) $client->person_id) {
+            return response()->json(['message' => 'Доступ запрещён'], 403);
+        }
+
+        if ($membership->status !== 'frozen') {
+            return response()->json(['message' => 'Абонемент не заморожен'], 409);
+        }
+
+        // Сколько дней заморозки ещё не использовано
+        $remainingFreezeDays = max(0, (int) now()->diffInDays($membership->frozen_until, false));
+
+        $membership->update([
+            'status'       => 'active',
+            'frozen_until' => null,
+            'end_date'     => $membership->end_date->subDays($remainingFreezeDays),
+        ]);
+
+        $msg = $remainingFreezeDays > 0
+            ? "Абонемент разморожен досрочно. Дата окончания скорректирована на {$remainingFreezeDays} дн."
+            : 'Абонемент разморожен';
+
+        return response()->json([
+            'message' => $msg,
+            'data'    => $this->formatMembership($membership->fresh(['client.person', 'membershipType'])),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/memberships/self-renew
+     * Клиент самостоятельно продлевает/покупает абонемент онлайн.
+     * Если есть активный абонемент — при успехе оплаты он будет продлён.
+     */
+    public function selfRenew(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'membership_type_id' => 'required|exists:membership_types,id',
+            'payment_method'     => 'required|in:online_sbp,card_terminal',
+            'promo_code'         => 'nullable|string|max:50',
+        ]);
+
+        $personId = auth()->user()->person?->id ?? 0;
+        $client = Client::with('person.user')->where('person_id', $personId)->firstOrFail();
+
+        // Блокируем создание дублирующего платежа
+        $pendingRenewal = Membership::where('client_id', $client->person_id)
+            ->where('is_renewal', true)
+            ->where('status', 'pending_payment')
+            ->first();
+        if ($pendingRenewal) {
+            return response()->json([
+                'message' => 'У вас уже есть незавершённый платёж за продление абонемента',
+            ], 409);
+        }
+
+        $type = MembershipType::findOrFail($data['membership_type_id']);
+
+        // Промокод
+        $promo      = null;
+        $finalPrice = (float) $type->price;
+        if (!empty($data['promo_code'])) {
+            $promo = PromoCode::where('code', $data['promo_code'])->first();
+            if (!$promo || !$promo->isValid()) {
+                return response()->json(['message' => 'Промокод недействителен'], 422);
+            }
+            $finalPrice = $type->calculatePrice($promo);
+        }
+
+        // Создаём «абонемент-заглушку» для платежа
+        $membership = Membership::create([
+            'membership_number'  => Membership::generateNumber(),
+            'client_id'          => $client->person_id,
+            'membership_type_id' => $type->id,
+            'administrator_id'   => null,
+            'start_date'         => now()->toDateString(),
+            'end_date'           => now()->addDays($type->duration_days)->toDateString(),
+            'remaining_visits'   => $type->visit_limit,
+            'status'             => 'pending_payment',
+            'is_renewal'         => true,
+        ]);
+
+        $payment = Payment::create([
+            'client_id'      => $client->person_id,
+            'membership_id'  => $membership->id,
+            'promo_code_id'  => $promo?->id,
+            'amount'         => $finalPrice,
+            'paid_at'        => now(),
+            'payment_method' => $data['payment_method'],
+            'status'         => 'pending',
+            'transaction_id' => 'TXN-' . strtoupper(uniqid()),
+        ]);
+
+        $frontend = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+
+        return response()->json([
+            'message'      => 'Перейдите на страницу оплаты',
+            'payment'      => [
+                'id'     => $payment->id,
+                'amount' => $payment->amount,
+                'method' => $payment->payment_method,
+                'status' => $payment->status,
+            ],
+            'redirect_url' => "{$frontend}/payment/{$payment->id}",
+        ], 201);
+    }
+
+    /**
      * POST /api/v1/memberships/{id}/freeze
      */
     public function freeze(Request $request, int $id): JsonResponse
@@ -468,11 +654,16 @@ class MembershipController extends Controller
                 'id'                => $m->id,
                 'membership_number' => $m->membership_number,
                 'type'              => $m->membershipType->name,
+                'type_id'           => $m->membership_type_id,
+                'visit_limit'       => $m->membershipType->visit_limit,
+                'duration_days'     => $m->membershipType->duration_days,
                 'status'            => $m->status,
                 'start_date'        => $m->start_date->toDateString(),
                 'end_date'          => $m->end_date->toDateString(),
                 'remaining_visits'  => $m->remaining_visits,
                 'frozen_until'      => $m->frozen_until?->toDateString(),
+                'has_been_frozen'   => $m->has_been_frozen,
+                'is_renewal'        => $m->is_renewal,
             ]),
         ]);
     }
@@ -494,6 +685,8 @@ class MembershipController extends Controller
             'end_date'         => $m->end_date->toDateString(),
             'remaining_visits' => $m->remaining_visits,
             'frozen_until'     => $m->frozen_until?->toDateString(),
+            'has_been_frozen'  => $m->has_been_frozen,
+            'is_renewal'       => $m->is_renewal,
             'created_at'       => $m->created_at->toDateTimeString(),
         ];
     }

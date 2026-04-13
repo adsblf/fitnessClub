@@ -25,6 +25,7 @@ import ClientDashboard from "./pages/client/ClientDashboard";
 import Schedule from "./pages/client/Schedule";
 import BookingConfirm from "./pages/client/BookingConfirm";
 import Bookings from "./pages/client/Bookings";
+import ClientMembership from "./pages/client/Membership";
 
 // Trainer pages
 import TrainerSchedule from "./pages/trainer/TrainerSchedule";
@@ -99,6 +100,7 @@ export default function App() {
                             <Route path="schedule" element={<Schedule />} />
                             <Route path="schedule/book/:id" element={<BookingConfirm />} />
                             <Route path="bookings" element={<Bookings />} />
+                            <Route path="membership" element={<ClientMembership />} />
                             <Route path="profile" element={<Stub title="Профиль" />} />
                         </Route>
                     </Route>

@@ -21,15 +21,19 @@ class Membership extends Model
         'end_date',
         'remaining_visits',
         'frozen_until',
+        'has_been_frozen',
+        'is_renewal',
         'status',
     ];
 
     protected function casts(): array
     {
         return [
-            'start_date' => 'date',
-            'end_date' => 'date',
-            'frozen_until' => 'date',
+            'start_date'      => 'date',
+            'end_date'        => 'date',
+            'frozen_until'    => 'date',
+            'has_been_frozen' => 'boolean',
+            'is_renewal'      => 'boolean',
         ];
     }
 
