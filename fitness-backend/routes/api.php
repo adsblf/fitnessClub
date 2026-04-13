@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MembershipController;
+use App\Http\Controllers\Api\OwnerController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\VisitController;
 use Illuminate\Support\Facades\Route;
@@ -128,6 +129,27 @@ Route::prefix('v1')->group(function () {
             Route::post('/',      [VisitController::class, 'store'])->middleware('role:admin,trainer');
             Route::put('/{id}',   [VisitController::class, 'update'])->middleware('role:admin,trainer');
             Route::get('/',       [VisitController::class, 'index'])->middleware('role:admin,owner');
+        });
+
+        // ── Владелец — суперпользователь ────────────────────────────
+        Route::prefix('owner')->middleware('role:owner')->group(function () {
+            // Персонал
+            Route::get('staff',          [OwnerController::class, 'listStaff']);
+            Route::post('staff',         [OwnerController::class, 'storeStaff']);
+            Route::put('staff/{id}',     [OwnerController::class, 'updateStaff']);
+            Route::delete('staff/{id}',  [OwnerController::class, 'destroyStaff']);
+
+            // Тарифные планы
+            Route::get('membership-types',         [OwnerController::class, 'listMembershipTypes']);
+            Route::post('membership-types',        [OwnerController::class, 'storeMembershipType']);
+            Route::put('membership-types/{id}',    [OwnerController::class, 'updateMembershipType']);
+            Route::delete('membership-types/{id}', [OwnerController::class, 'destroyMembershipType']);
+
+            // Промокоды
+            Route::get('promo-codes',          [OwnerController::class, 'listPromoCodes']);
+            Route::post('promo-codes',         [OwnerController::class, 'storePromoCode']);
+            Route::put('promo-codes/{id}',     [OwnerController::class, 'updatePromoCode']);
+            Route::delete('promo-codes/{id}',  [OwnerController::class, 'destroyPromoCode']);
         });
     });
 });

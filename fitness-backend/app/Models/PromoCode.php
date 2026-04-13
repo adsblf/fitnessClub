@@ -45,10 +45,29 @@ class PromoCode extends Model
     }
 
     /**
+     * Проверить, действителен ли промокод для конкретного типа абонемента.
+     * Если ограничений нет — действует на все типы.
+     */
+    public function isValidForType(int $membershipTypeId): bool
+    {
+        if (!$this->isValid()) return false;
+        $restricted = $this->membershipTypes()->exists();
+        if (!$restricted) return true;
+        return $this->membershipTypes()->where('membership_types.id', $membershipTypeId)->exists();
+    }
+
+    /**
      * Использовать промокод (увеличить счётчик).
      */
     public function markUsed(): void
     {
         $this->increment('used_count');
+    }
+
+    // ── Связи ──────────────────────────────────────────
+
+    public function membershipTypes()
+    {
+        return $this->belongsToMany(MembershipType::class, 'promo_code_membership_type');
     }
 }

@@ -85,6 +85,8 @@ class MembershipController extends Controller
                 $promoMessage = 'Промокод не найден';
             } elseif (!$promo->isValid()) {
                 $promoMessage = 'Промокод недействителен или истёк';
+            } elseif (!$promo->isValidForType($type->id)) {
+                $promoMessage = 'Промокод не действует на выбранный тип абонемента';
             } else {
                 $final = $type->calculatePrice($promo);
                 $promoValid = true;
