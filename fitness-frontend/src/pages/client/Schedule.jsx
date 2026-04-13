@@ -122,7 +122,7 @@ export default function Schedule() {
     setLoading(true);
     scheduleApi
         .list({ date: activeDate })
-        .then((r) => setSessions(r.data.data))
+        .then((r) => setSessions(r.data.data.filter(s => s.type === 'group')))
         .finally(() => setLoading(false));
   }, [activeDate]);
 

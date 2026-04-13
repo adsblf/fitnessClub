@@ -129,7 +129,7 @@ function BookingCard({ booking, onAction }) {
 
       {/* Кнопки действия */}
       <div className="flex gap-2 mt-auto pt-2">
-        {isUpcoming && booking.status === "confirmed" && (
+        {isUpcoming && booking.status === "confirmed" && booking.source !== 'personal_session' && (
           <button
             onClick={() => onAction("cancel", booking.id)}
             className="flex-1 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"

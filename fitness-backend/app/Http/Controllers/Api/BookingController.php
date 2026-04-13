@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\BookingRequest;
 use App\Models\Booking;
 use App\Models\Client;
+use App\Models\PersonalSession;
 use App\Models\Session;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -210,17 +211,65 @@ class BookingController extends Controller
     /**
      * GET /api/v1/clients/{clientId}/bookings
      * Получить все записи клиента на занятия.
+     * Включает как самостоятельные записи (bookings), так и персональные тренировки,
+     * назначенные администратором (personal_sessions).
      */
     public function clientBookings(int $clientId): JsonResponse
     {
-        $bookings = Booking::with(['session.groupSession', 'session.trainer', 'session.hall'])
+        // 1. Обычные записи клиента (через таблицу bookings)
+        $bookings = Booking::with(['session.groupSession', 'session.trainer.person', 'session.hall'])
             ->where('client_id', $clientId)
             ->orderByDesc('created_at')
             ->get();
 
+        $bookedSessionIds = $bookings->pluck('session_id')->all();
+
+        // 2. Персональные тренировки, назначенные администратором
+        // Исключаем те, для которых уже есть запись в bookings (чтобы не дублировать)
+        $personalSessions = PersonalSession::with(['session.trainer.person', 'session.hall'])
+            ->where('client_id', $clientId)
+            ->whereNotIn('session_id', $bookedSessionIds)
+            ->get();
+
+        $data = collect()
+            ->merge($bookings->map(fn ($b) => $this->formatClientBooking($b)))
+            ->merge($personalSessions->map(fn ($ps) => $this->formatPersonalSessionAsBooking($ps)))
+            ->sortByDesc('datetime_start')
+            ->values();
+
         return response()->json([
-            'data' => $bookings->map(fn ($b) => $this->formatClientBooking($b)),
+            'data' => $data,
         ]);
+    }
+
+    private function formatPersonalSessionAsBooking(PersonalSession $ps): array
+    {
+        $session = $ps->session;
+        $statusMap = [
+            'scheduled' => 'confirmed',
+            'completed' => 'completed',
+            'cancelled' => 'cancelled',
+        ];
+        return [
+            'id'               => 'ps_' . $ps->session_id,
+            'session_id'       => $ps->session_id,
+            'status'           => $statusMap[$session->status] ?? 'confirmed',
+            'source'           => 'personal_session',
+            'session_name'     => 'Персональная тренировка',
+            'session_type'     => 'personal',
+            'type'             => 'personal',
+            'trainer_name'     => $session->trainer?->person?->full_name ?? 'Не назначен',
+            'hall'             => $session->hall
+                ? ['id' => $session->hall->id, 'number' => $session->hall->number]
+                : null,
+            'time_start'       => $session->starts_at->format('H:i'),
+            'time_end'         => $session->ends_at->format('H:i'),
+            'date'             => $session->starts_at->toDateString(),
+            'datetime_start'   => $session->starts_at->toDateTimeString(),
+            'datetime_end'     => $session->ends_at->toDateTimeString(),
+            'duration'         => $session->starts_at->diffInMinutes($session->ends_at),
+            'difficulty_level' => null,
+        ];
     }
 
     private function formatBooking(Booking $b): array
