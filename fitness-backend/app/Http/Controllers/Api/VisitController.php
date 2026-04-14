@@ -54,9 +54,8 @@ class VisitController extends Controller
             ], 409);
         }
 
-        // Определить, кто регистрирует (admin или trainer)
-        $adminId = auth()->user()->person?->administrator?->person_id
-                ?? auth()->user()->person?->id;
+        // Определить, кто регистрирует: только если это администратор
+        $adminId = auth()->user()->person?->administrator?->person_id ?? null;
 
         // Создать посещение
         $visit = Visit::create([

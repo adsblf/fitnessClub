@@ -1,123 +1,108 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../context/useAuth";
-import { scheduleApi } from "../../api/schedule";
-import { bookingsApi } from "../../api/bookings";
 import { visitsApi } from "../../api/visits";
+import { scheduleApi } from "../../api/schedule";
+import SessionVisitBlock from "../../components/SessionVisitBlock";
 
 export default function TrainerSchedule() {
   const { user } = useAuth();
+  const myTrainerId = user.person_id ?? user.id;
+
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [bookings, setBookings] = useState([]);
-  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [subTab, setSubTab] = useState("current"); // 'current' | 'archive'
+  const autoCompleteDoneRef = useRef(false);
+
+  const fetchSessions = useCallback(() => {
+    setLoading(true);
+    visitsApi
+      .sessionsWithVisits({ trainer_id: myTrainerId, per_page: 1000 })
+      .then((r) => {
+        // Исключаем отменённые занятия
+        setSessions(r.data.data.filter((s) => s.status !== "cancelled"));
+      })
+      .finally(() => setLoading(false));
+  }, [myTrainerId]);
 
   useEffect(() => {
-    scheduleApi
-      .list({ trainer_id: user.id })
-      .then((r) => setSessions(r.data.data))
-      .finally(() => setLoading(false));
-  }, [user.id]);
-
-  async function openBookings(session) {
-    setSelectedSession(session);
-    setBookingsLoading(true);
-    try {
-      const r = await bookingsApi.sessionBookings(session.id);
-      setBookings(r.data.data);
-    } finally {
-      setBookingsLoading(false);
+    // Один раз авто-завершаем просроченные занятия, затем загружаем список
+    if (!autoCompleteDoneRef.current) {
+      autoCompleteDoneRef.current = true;
+      scheduleApi
+        .autoComplete()
+        .catch(() => {})
+        .finally(() => fetchSessions());
+    } else {
+      fetchSessions();
     }
-  }
+  }, [fetchSessions]);
 
-  async function handleMarkVisit(clientId, sessionId) {
-    try {
-      await visitsApi.create({ client_id: clientId, session_id: sessionId });
-      alert("Посещение зарегистрировано, посещение списано с абонемента");
-      openBookings(selectedSession);
-    } catch (err) {
-      alert(err.response?.data?.message || "Ошибка");
-    }
-  }
+  const now = new Date();
 
-  if (loading) return <div className="p-6 text-sm text-zinc-400">Загрузка...</div>;
+  // Предстоящие/текущие: архивное время ещё не наступило (ends_at + 1 час)
+  const upcomingSessions = sessions
+    .filter((s) => new Date(s.ends_at).getTime() + 3_600_000 > now.getTime())
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+  // Архив: прошло больше часа с момента завершения
+  const archiveSessions = sessions
+    .filter((s) => new Date(s.ends_at).getTime() + 3_600_000 <= now.getTime())
+    .sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+
+  const displayed = subTab === "current" ? upcomingSessions : archiveSessions;
 
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Моё расписание</h1>
 
-      {sessions.length === 0 ? (
-        <div className="text-sm text-zinc-400">Занятий не найдено</div>
+      {/* Подвкладки */}
+      <div className="flex gap-0 border-b border-zinc-200 dark:border-zinc-800">
+        <TabBtn active={subTab === "current"} onClick={() => setSubTab("current")}>
+          📅 Предстоящие и текущие
+          {upcomingSessions.length > 0 && (
+            <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded text-xs font-medium">
+              {upcomingSessions.length}
+            </span>
+          )}
+        </TabBtn>
+        <TabBtn active={subTab === "archive"} onClick={() => setSubTab("archive")}>
+          📦 Архив
+          {archiveSessions.length > 0 && (
+            <span className="ml-1.5 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded text-xs font-medium">
+              {archiveSessions.length}
+            </span>
+          )}
+        </TabBtn>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-sm text-zinc-400">Загрузка...</div>
+      ) : displayed.length === 0 ? (
+        <div className="py-10 text-center text-sm text-zinc-400">
+          {subTab === "current" ? "Нет предстоящих занятий" : "Нет архивных занятий"}
+        </div>
       ) : (
-        <div className="space-y-3">
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => openBookings(s)}
-              className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 cursor-pointer hover:shadow-sm transition-shadow"
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
-                    {s.name ?? "Персональная"} — {s.date}
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-0.5">
-                    {s.time_start}–{s.time_end} · Зал {s.hall?.number}
-                    {s.type === "group" && ` · ${s.registered}/${s.max_participants} записано`}
-                  </div>
-                </div>
-                <span className="text-xs text-zinc-400">Подробнее →</span>
-              </div>
-            </div>
+        <div className="space-y-4">
+          {displayed.map((s) => (
+            <SessionVisitBlock key={s.id} session={s} onUpdated={fetchSessions} />
           ))}
         </div>
       )}
-
-      {/* Модалка списка клиентов */}
-      {selectedSession && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setSelectedSession(null)}>
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
-              {selectedSession.name ?? "Персональная"}
-            </h2>
-            <p className="text-xs text-zinc-400 mb-4">
-              {selectedSession.date} · {selectedSession.time_start}–{selectedSession.time_end}
-            </p>
-
-            {bookingsLoading ? (
-              <div className="text-sm text-zinc-400">Загрузка...</div>
-            ) : bookings.length === 0 ? (
-              <div className="text-sm text-zinc-400">Нет записей</div>
-            ) : (
-              <div className="space-y-2">
-                {bookings.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3">
-                    <div>
-                      <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{b.client_name}</div>
-                      <div className="text-xs text-zinc-400 capitalize">{b.status}</div>
-                    </div>
-                    {(b.status === "booked" || b.status === "confirmed") && (
-                      <button
-                        onClick={() => handleMarkVisit(b.client_id, selectedSession.id)}
-                        className="text-xs px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg font-medium hover:bg-emerald-200 transition-colors"
-                      >
-                        Отметить посещение
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={() => setSelectedSession(null)}
-              className="mt-4 w-full py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-400"
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
     </div>
+  );
+}
+
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+        active
+          ? "border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100"
+          : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

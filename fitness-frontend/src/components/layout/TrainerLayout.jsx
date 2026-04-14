@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 
 const nav = [
-  { to: "/trainer",           label: "Расписание",  icon: "📅" },
+  { to: "/trainer",             label: "Расписание",  icon: "📅" },
   { to: "/trainer/my-clients", label: "Мои клиенты", icon: "👥" },
 ];
 

@@ -213,6 +213,14 @@ class ScheduleController extends Controller
         $session = Session::findOrFail($id);
         $data = $request->validated();
 
+        // Тренер может редактировать только свои занятия
+        if ($this->isTrainerOnly()) {
+            $personId = $this->getAuthPersonId();
+            if (!$personId || $session->trainer_id !== $personId) {
+                return response()->json(['message' => 'Вы можете редактировать только свои занятия'], 403);
+            }
+        }
+
         $session->update(array_filter([
             'hall_id'    => $data['hall_id'] ?? null,
             'trainer_id' => $data['trainer_id'] ?? null,
@@ -265,6 +273,14 @@ class ScheduleController extends Controller
     {
         $session = Session::findOrFail($id);
 
+        // Тренер может отменять только свои занятия
+        if ($this->isTrainerOnly()) {
+            $personId = $this->getAuthPersonId();
+            if (!$personId || $session->trainer_id !== $personId) {
+                return response()->json(['message' => 'Вы можете отменять только свои занятия'], 403);
+            }
+        }
+
         if ($session->status === 'cancelled') {
             return response()->json(['message' => 'Занятие уже отменено'], 409);
         }
@@ -312,6 +328,28 @@ class ScheduleController extends Controller
                 'description'    => $t->description,
             ]),
         ]);
+    }
+
+    /**
+     * Возвращает true, если текущий пользователь — тренер без прав admin/owner.
+     */
+    private function isTrainerOnly(): bool
+    {
+        $user = auth()->user();
+        $roles = $user->roles->pluck('name')->toArray();
+        return in_array('trainer', $roles)
+            && !in_array('admin', $roles)
+            && !in_array('owner', $roles);
+    }
+
+    /**
+     * Возвращает persons.id текущего пользователя.
+     */
+    private function getAuthPersonId(): ?int
+    {
+        $user = auth()->user();
+        $user->loadMissing('person');
+        return $user->person?->id;
     }
 
     /**

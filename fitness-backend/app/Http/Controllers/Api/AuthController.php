@@ -134,6 +134,7 @@ class AuthController extends Controller
         ];
 
         if ($user->person) {
+            $result['person_id']  = $user->person->id;
             $result['full_name']  = $user->person->full_name;
             $result['phone']      = $user->person->phone;
             $result['birth_date'] = $user->person->birth_date?->toDateString();

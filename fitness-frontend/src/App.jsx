@@ -32,7 +32,7 @@ import Bookings from "./pages/client/Bookings";
 import ClientMembership from "./pages/client/Membership";
 
 // Trainer pages
-import TrainerSchedule from "./pages/trainer/TrainerSchedule";
+import TrainerFullSchedule from "./pages/trainer/TrainerFullSchedule";
 
 // Payment emulator (public)
 import PaymentEmulator from "./pages/payment/PaymentEmulator";
@@ -116,7 +116,7 @@ export default function App() {
                     {/* ── Тренер ── */}
                     <Route element={<RequireRole roles={["trainer"]} />}>
                         <Route path="/trainer" element={<TrainerLayout />}>
-                            <Route index element={<TrainerSchedule />} />
+                            <Route index element={<TrainerFullSchedule />} />
                             <Route path="my-clients" element={<Stub title="Мои клиенты" />} />
                         </Route>
                     </Route>

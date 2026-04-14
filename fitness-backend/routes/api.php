@@ -80,10 +80,10 @@ Route::prefix('v1')->group(function () {
         Route::prefix('schedule')->group(function () {
             Route::get('/',              [ScheduleController::class, 'index']);
             Route::get('/{id}',          [ScheduleController::class, 'show']);
-            Route::post('/',             [ScheduleController::class, 'store'])->middleware('role:admin');
-            Route::put('/{id}',          [ScheduleController::class, 'update'])->middleware('role:admin');
-            Route::post('/auto-complete',[ScheduleController::class, 'autoComplete'])->middleware('role:admin');
-            Route::post('/{id}/cancel',  [ScheduleController::class, 'cancel'])->middleware('role:admin');
+            Route::post('/',             [ScheduleController::class, 'store'])->middleware('role:admin,trainer');
+            Route::put('/{id}',          [ScheduleController::class, 'update'])->middleware('role:admin,trainer');
+            Route::post('/auto-complete',[ScheduleController::class, 'autoComplete'])->middleware('role:admin,trainer');
+            Route::post('/{id}/cancel',  [ScheduleController::class, 'cancel'])->middleware('role:admin,trainer');
         });
 
         // Справочники
