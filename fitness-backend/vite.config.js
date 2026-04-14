@@ -10,6 +10,9 @@ export default defineConfig({
         }),
         tailwindcss(),
     ],
+    preview: {
+        allowedHosts: ['fitnessclubfrontend-production.up.railway.app']
+    },
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],
