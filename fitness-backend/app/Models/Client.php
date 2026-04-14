@@ -68,6 +68,18 @@ class Client extends Model
         return $this->hasMany(Payment::class, 'client_id', 'person_id');
     }
 
+    public function trainers()
+    {
+        return $this->belongsToMany(
+            Trainer::class,
+            'trainer_clients',
+            'client_id',
+            'trainer_id',
+            'person_id',
+            'person_id'
+        )->withPivot('attached_at');
+    }
+
     // ── Хелперы ────────────────────────────────────────
 
     /**

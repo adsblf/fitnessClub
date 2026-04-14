@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MembershipController;
 use App\Http\Controllers\Api\OwnerController;
 use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\TrainerClientController;
 use App\Http\Controllers\Api\VisitController;
 use Illuminate\Support\Facades\Route;
 
@@ -129,6 +130,17 @@ Route::prefix('v1')->group(function () {
             Route::post('/',      [VisitController::class, 'store'])->middleware('role:admin,trainer');
             Route::put('/{id}',   [VisitController::class, 'update'])->middleware('role:admin,trainer');
             Route::get('/',       [VisitController::class, 'index'])->middleware('role:admin,owner');
+        });
+
+        // ── Тренер — управление своими клиентами ─────────────────────
+        Route::prefix('trainer')->middleware('role:trainer')->group(function () {
+            Route::get('clients',                                             [TrainerClientController::class, 'index']);
+            Route::post('clients',                                            [TrainerClientController::class, 'attach']);
+            Route::delete('clients/{clientId}',                              [TrainerClientController::class, 'detach']);
+            Route::get('clients/{clientId}',                                 [TrainerClientController::class, 'show']);
+            Route::put('clients/{clientId}/card',                            [TrainerClientController::class, 'upsertCard']);
+            Route::post('clients/{clientId}/measurements',                   [TrainerClientController::class, 'addMeasurement']);
+            Route::delete('clients/{clientId}/measurements/{measurementId}', [TrainerClientController::class, 'deleteMeasurement']);
         });
 
         // ── Владелец — суперпользователь ────────────────────────────
