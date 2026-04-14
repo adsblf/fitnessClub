@@ -39,6 +39,13 @@ class BookingController extends Controller
             ], 409);
         }
 
+        // Проверка 1b: занятие уже началось
+        if ($session->starts_at->lte(now())) {
+            return response()->json([
+                'message' => 'Запись закрыта — тренировка уже началась или завершена',
+            ], 409);
+        }
+
         // Проверка 3: активный абонемент
         $membership = $client->getActiveMembership();
         if (!$membership) {

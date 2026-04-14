@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             \Database\Seeders\RoleSeeder::class,
             \Database\Seeders\DemoSeeder::class,
+            \Database\Seeders\TestDataSeeder::class,
         ]);
     }
 }

@@ -226,11 +226,14 @@ class OwnerController extends Controller
         $data = $request->validate([
             'name'          => 'required|string|max:100',
             'price'         => 'required|numeric|min:0',
-            'visit_limit'   => 'required|integer|min:1',
+            'visit_limit'   => 'nullable|integer|min:1',
             'duration_days' => 'required|integer|min:1',
             'description'   => 'nullable|string|max:1000',
             'is_active'     => 'boolean',
         ]);
+
+        // Пустой лимит = безлимитный абонемент (999)
+        $data['visit_limit'] = $data['visit_limit'] ?? 999;
 
         $type = MembershipType::create($data);
 
@@ -250,11 +253,16 @@ class OwnerController extends Controller
         $data = $request->validate([
             'name'          => 'sometimes|string|max:100',
             'price'         => 'sometimes|numeric|min:0',
-            'visit_limit'   => 'sometimes|integer|min:1',
+            'visit_limit'   => 'sometimes|nullable|integer|min:1',
             'duration_days' => 'sometimes|integer|min:1',
             'description'   => 'sometimes|nullable|string|max:1000',
             'is_active'     => 'sometimes|boolean',
         ]);
+
+        // Явно переданный null или пустое значение = безлимитный (999)
+        if (array_key_exists('visit_limit', $data) && $data['visit_limit'] === null) {
+            $data['visit_limit'] = 999;
+        }
 
         $type->update($data);
 

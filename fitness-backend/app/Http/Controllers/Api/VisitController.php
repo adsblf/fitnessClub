@@ -31,10 +31,26 @@ class VisitController extends Controller
         // Найти активный абонемент
         $membership = $client->getActiveMembership();
 
+        // Если у клиента нет активного абонемента, но есть подтверждённая запись
+        // на это занятие — разрешаем отметить посещение без списания (абонемент
+        // мог истечь после записи). В этом случае используем последний абонемент
+        // клиента только для справки (membership_id).
+        $hasBooking = !empty($data['session_id']) && \App\Models\Booking::where('client_id', $client->person_id)
+            ->where('session_id', $data['session_id'])
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->exists();
+
         if (!$membership) {
-            return response()->json([
-                'message' => 'У клиента нет активного абонемента',
-            ], 409);
+            if (!$hasBooking) {
+                return response()->json([
+                    'message' => 'У клиента нет активного абонемента',
+                ], 409);
+            }
+            // Клиент записан, но абонемент истёк — отмечаем посещение без списания
+            $membership = $client->memberships()->latest()->first(); // может быть null
+            $deduct = false;
+        } else {
+            $deduct = true;
         }
 
         // Если указана сессия, проверить, можно ли её редактировать
@@ -47,8 +63,8 @@ class VisitController extends Controller
             }
         }
 
-        // Списать посещение
-        if (!$membership->deductVisit()) {
+        // Списать посещение (только если абонемент активен)
+        if ($deduct && !$membership->deductVisit()) {
             return response()->json([
                 'message' => 'На абонементе не осталось посещений (остаток: 0)',
             ], 409);
@@ -71,8 +87,13 @@ class VisitController extends Controller
 
         $visit->load(['client.person', 'session', 'membership']);
 
+        $remaining = $deduct ? $membership->fresh()->remaining_visits : null;
+        $message = $deduct
+            ? 'Посещение зарегистрировано. Остаток: ' . $remaining
+            : 'Посещение зарегистрировано (абонемент истёк, списание не выполнено)';
+
         return response()->json([
-            'message' => 'Посещение зарегистрировано. Остаток: ' . $membership->fresh()->remaining_visits,
+            'message' => $message,
             'data'    => $this->formatVisit($visit),
         ], 201);
     }
@@ -240,8 +261,8 @@ class VisitController extends Controller
             'hall_name'        => $session->hall ? ('Зал ' . $session->hall->number) : 'Зал',
             'trainer_name'     => $session->trainer?->person->full_name ?? 'Без тренера',
             'session_name'     => $session->groupSession?->name ?? 'Персональное занятие',
-            'starts_at'        => $session->starts_at->toDateTimeString(),
-            'ends_at'          => $session->ends_at->toDateTimeString(),
+            'starts_at'        => $session->starts_at->toIso8601String(),
+            'ends_at'          => $session->ends_at->toIso8601String(),
             'type'             => $session->type,
             'status'           => $session->status,
             'is_editable'      => $session->isEditable(),

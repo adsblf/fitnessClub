@@ -64,6 +64,17 @@ class Booking extends Model
     }
 
     /**
+     * Отклонить запись автоматически (системой, без конкретного администратора).
+     */
+    public function rejectBySystem(): void
+    {
+        $this->update([
+            'status'           => 'rejected',
+            'administrator_id' => null,
+        ]);
+    }
+
+    /**
      * Отменить запись (по инициативе клиента или системе).
      */
     public function cancel(): void

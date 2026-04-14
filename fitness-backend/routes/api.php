@@ -53,12 +53,12 @@ Route::prefix('v1')->group(function () {
 
         // Клиенты — CRUD
         Route::prefix('clients')->group(function () {
-            Route::get('/search', [ClientController::class, 'search'])->middleware('role:admin,trainer');
+            Route::get('/search', [ClientController::class, 'search'])->middleware('role:admin,trainer,owner');
             Route::get('/',     [ClientController::class, 'index'])->middleware('role:admin,owner');
-            Route::post('/',    [ClientController::class, 'store'])->middleware('role:admin');
+            Route::post('/',    [ClientController::class, 'store'])->middleware('role:admin,owner');
             Route::get('/{id}', [ClientController::class, 'show'])->middleware('role:admin,owner,trainer,client');
-            Route::put('/{id}', [ClientController::class, 'update'])->middleware('role:admin');
-            Route::delete('/{id}', [ClientController::class, 'destroy'])->middleware('role:admin');
+            Route::put('/{id}', [ClientController::class, 'update'])->middleware('role:admin,owner');
+            Route::delete('/{id}', [ClientController::class, 'destroy'])->middleware('role:admin,owner');
 
             // Абонементы клиента
             Route::get('/{id}/memberships', [MembershipController::class, 'clientMemberships'])
@@ -81,10 +81,10 @@ Route::prefix('v1')->group(function () {
         Route::prefix('schedule')->group(function () {
             Route::get('/',              [ScheduleController::class, 'index']);
             Route::get('/{id}',          [ScheduleController::class, 'show']);
-            Route::post('/',             [ScheduleController::class, 'store'])->middleware('role:admin,trainer');
-            Route::put('/{id}',          [ScheduleController::class, 'update'])->middleware('role:admin,trainer');
-            Route::post('/auto-complete',[ScheduleController::class, 'autoComplete'])->middleware('role:admin,trainer');
-            Route::post('/{id}/cancel',  [ScheduleController::class, 'cancel'])->middleware('role:admin,trainer');
+            Route::post('/',             [ScheduleController::class, 'store'])->middleware('role:admin,trainer,owner');
+            Route::put('/{id}',          [ScheduleController::class, 'update'])->middleware('role:admin,trainer,owner');
+            Route::post('/auto-complete',[ScheduleController::class, 'autoComplete'])->middleware('role:admin,trainer,owner');
+            Route::post('/{id}/cancel',  [ScheduleController::class, 'cancel'])->middleware('role:admin,trainer,owner');
         });
 
         // Справочники
@@ -96,7 +96,7 @@ Route::prefix('v1')->group(function () {
 
         // Расчёт цены доступен админу и клиенту
         Route::post('memberships/calculate-price', [MembershipController::class, 'calculatePrice'])
-            ->middleware('role:admin,client');
+            ->middleware('role:admin,client,owner');
 
         // Клиентские маршруты управления абонементом
         Route::post('memberships/self-renew',          [MembershipController::class, 'selfRenew'])->middleware('role:client');
@@ -106,29 +106,29 @@ Route::prefix('v1')->group(function () {
         // Абонементы — управление
         Route::prefix('memberships')->group(function () {
             Route::get('/',                 [MembershipController::class, 'index'])->middleware('role:admin,owner');
-            Route::post('/',                [MembershipController::class, 'store'])->middleware('role:admin');
-            Route::post('/{id}/freeze',     [MembershipController::class, 'freeze'])->middleware('role:admin');
-            Route::post('/{id}/unfreeze',   [MembershipController::class, 'unfreeze'])->middleware('role:admin');
-            Route::post('/{id}/cancel',     [MembershipController::class, 'cancel'])->middleware('role:admin');
+            Route::post('/',                [MembershipController::class, 'store'])->middleware('role:admin,owner');
+            Route::post('/{id}/freeze',     [MembershipController::class, 'freeze'])->middleware('role:admin,owner');
+            Route::post('/{id}/unfreeze',   [MembershipController::class, 'unfreeze'])->middleware('role:admin,owner');
+            Route::post('/{id}/cancel',     [MembershipController::class, 'cancel'])->middleware('role:admin,owner');
         });
 
         // Записи на занятия
         Route::prefix('bookings')->group(function () {
-            Route::post('/',       [BookingController::class, 'store'])->middleware('role:admin,client');
-            Route::delete('/{id}', [BookingController::class, 'destroy'])->middleware('role:admin,client');
-            Route::post('/{id}/approve', [BookingController::class, 'approve'])->middleware('role:admin');
-            Route::post('/{id}/reject',  [BookingController::class, 'reject'])->middleware('role:admin');
+            Route::post('/',       [BookingController::class, 'store'])->middleware('role:admin,client,owner');
+            Route::delete('/{id}', [BookingController::class, 'destroy'])->middleware('role:admin,client,owner');
+            Route::post('/{id}/approve', [BookingController::class, 'approve'])->middleware('role:admin,owner');
+            Route::post('/{id}/reject',  [BookingController::class, 'reject'])->middleware('role:admin,owner');
         });
 
         // Список записей на конкретное занятие
         Route::get('sessions/{id}/bookings', [BookingController::class, 'sessionBookings'])
-            ->middleware('role:admin,trainer');
+            ->middleware('role:admin,trainer,owner');
 
         // Посещения
         Route::prefix('visits')->group(function () {
             Route::get('/sessions-with-visits', [VisitController::class, 'sessionsWithVisits'])->middleware('role:admin,trainer,owner');
-            Route::post('/',      [VisitController::class, 'store'])->middleware('role:admin,trainer');
-            Route::put('/{id}',   [VisitController::class, 'update'])->middleware('role:admin,trainer');
+            Route::post('/',      [VisitController::class, 'store'])->middleware('role:admin,trainer,owner');
+            Route::put('/{id}',   [VisitController::class, 'update'])->middleware('role:admin,trainer,owner');
             Route::get('/',       [VisitController::class, 'index'])->middleware('role:admin,owner');
         });
 

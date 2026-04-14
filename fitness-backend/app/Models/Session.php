@@ -81,11 +81,12 @@ class Session extends Model
 
     /**
      * Можно ли редактировать посещения этого занятия.
-     * Редактировать можно только во время или после начала занятия.
+     * Редактировать можно во время или после начала занятия,
+     * либо если занятие уже завершено (status = completed).
      */
     public function isEditable(): bool
     {
-        return now()->greaterThanOrEqualTo($this->starts_at);
+        return $this->status === 'completed' || now()->greaterThanOrEqualTo($this->starts_at);
     }
 
     /**

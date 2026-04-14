@@ -29,7 +29,8 @@ export default function OwnerMembershipTypes() {
   function openEdit(t) {
     setForm({
       name: t.name ?? "", duration_days: t.duration_days ?? "",
-      visit_limit: t.visit_limit ?? "", price: t.price ?? "",
+      visit_limit: (!t.visit_limit || t.visit_limit >= 999) ? "" : t.visit_limit,
+      price: t.price ?? "",
       description: t.description ?? "", is_active: !!t.is_active,
     });
     setError(null);
@@ -43,8 +44,13 @@ export default function OwnerMembershipTypes() {
     if (!form.duration_days)  { setError("Введите срок действия"); return; }
     setSaving(true); setError(null);
     try {
-      if (modal.mode === "add") await ownerApi.storeMembershipType(form);
-      else                      await ownerApi.updateMembershipType(modal.id, form);
+      const payload = {
+        ...form,
+        // Пустое поле = безлимитный абонемент (бэкенд установит 999)
+        visit_limit: form.visit_limit === "" ? null : form.visit_limit,
+      };
+      if (modal.mode === "add") await ownerApi.storeMembershipType(payload);
+      else                      await ownerApi.updateMembershipType(modal.id, payload);
       setModal(null); load();
     } catch (err) {
       const msg  = err.response?.data?.message;
@@ -98,7 +104,7 @@ export default function OwnerMembershipTypes() {
                   </td>
                   <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 font-medium">{Number(t.price).toLocaleString("ru-RU")} ₽</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.duration_days} дн.</td>
-                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.visit_limit ?? "∞"}</td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{(!t.visit_limit || t.visit_limit >= 999) ? "∞" : t.visit_limit}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${t.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"}`}>
                       {t.is_active ? "Активен" : "Неактивен"}

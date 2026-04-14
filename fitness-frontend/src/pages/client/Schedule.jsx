@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { scheduleApi } from "../../api/schedule";
+import { TZ } from "../../lib/tz";
 
 const LEVEL_COLOR = {
   "Начальный":   "bg-emerald-100 text-emerald-700",
@@ -17,11 +18,11 @@ const BOOKING_STATUS_MAP = {
 
 function dayTabs(n = 7) {
   const days = [];
-  const now = new Date();
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ });
   for (let i = 0; i < n; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() + i);
-    days.push(d.toISOString().split("T")[0]);
+    // добавляем i суток (в мс) к текущему моменту и берём локальную дату UTC+6
+    const d = new Date(Date.now() + i * 24 * 60 * 60 * 1000);
+    days.push(fmt.format(d));
   }
   return days;
 }
@@ -37,6 +38,8 @@ function ClassCard({ session, onBook }) {
   // Проверяем статус записи клиента
   const bookingStatus = session.client_booking ? session.client_booking.status : null;
   const isCancelled = session.status === "cancelled";
+  // Блокируем запись, если тренировка уже началась (starts_at — ISO 8601 с офсетом +06)
+  const isStarted = new Date(session.starts_at) <= new Date();
 
   return (
       <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-3 hover:shadow-sm transition-shadow">
@@ -83,6 +86,10 @@ function ClassCard({ session, onBook }) {
           {isCancelled ? (
               <div className="text-sm text-red-600 dark:text-red-400 font-medium">
                 ⚠️ Тренировка отменена
+              </div>
+          ) : isStarted ? (
+              <div className="text-sm text-zinc-400 dark:text-zinc-500">
+                Запись закрыта
               </div>
           ) : bookingStatus ? (
               <div className={`text-sm font-medium inline-flex px-2.5 py-1 rounded-lg text-xs ${BOOKING_STATUS_MAP[bookingStatus]?.cls ?? "bg-zinc-100 text-zinc-600"}`}>

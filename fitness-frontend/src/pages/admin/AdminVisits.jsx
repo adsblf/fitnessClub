@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { visitsApi } from "../../api/visits";
+import { scheduleApi } from "../../api/schedule";
 import SessionVisitBlock from "../../components/SessionVisitBlock";
 import QuickCheckIn from "../../components/QuickCheckIn";
 import { todayStr, daysAgoStr, firstOfMonthStr } from "../../lib/tz";
 
 export default function AdminVisits() {
   const [activeTab, setActiveTab] = useState("group"); // 'group', 'personal', 'checkin'
+
+  // Актуализируем статусы занятий при загрузке страницы и каждые 30 минут
+  useEffect(() => {
+    scheduleApi.autoComplete().catch(() => {});
+    const id = setInterval(() => scheduleApi.autoComplete().catch(() => {}), 30 * 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
@@ -64,6 +72,13 @@ function GroupSessionsTab() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [subTab, setSubTab] = useState("current"); // 'current' или 'archive'
+  const [tick, setTick] = useState(0); // обновляет фильтр каждую минуту
+
+  // Автообновление: перезагружаем данные каждые 60 секунд
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const fetch = useCallback(
     () => {
@@ -92,26 +107,17 @@ function GroupSessionsTab() {
 
   useEffect(() => {
     fetch();
-  }, [fetch]);
+  }, [fetch, tick]); // tick triggers refetch every 60s
 
   useEffect(() => { setPage(1); }, [subTab]);
 
-  // Фильтруем сессии по архиву/текущим
+  // Фильтруем сессии по архиву/текущим на основе серверного статуса
   const PAGE_SIZE = 25;
-  const now = new Date();
-  const filteredSessions = sessions.filter(session => {
-    const sessionEnd = new Date(session.ends_at);
-    // Добавляем 1 час к времени окончания для определения времени архивирования
-    const archiveTime = new Date(sessionEnd.getTime() + 60 * 60 * 1000);
-
-    if (subTab === "current") {
-      // Текущие: время архивирования еще не наступило
-      return now < archiveTime;
-    } else {
-      // Архив: время архивирования наступило
-      return now >= archiveTime;
-    }
-  });
+  const filteredSessions = sessions.filter(session =>
+    subTab === "current"
+      ? session.status !== "completed"
+      : session.status === "completed"
+  );
   const totalPages = Math.ceil(filteredSessions.length / PAGE_SIZE);
   const paginatedSessions = filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -264,6 +270,13 @@ function PersonalSessionsTab() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [subTab, setSubTab] = useState("current"); // 'current' или 'archive'
+  const [tick, setTick] = useState(0); // обновляет фильтр каждую минуту
+
+  // Авто-обновление: перезагружаем данные каждые 60 секунд
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const fetch = useCallback(
     () => {
@@ -292,26 +305,17 @@ function PersonalSessionsTab() {
 
   useEffect(() => {
     fetch();
-  }, [fetch]);
+  }, [fetch, tick]); // tick triggers refetch every 60s
 
   useEffect(() => { setPage(1); }, [subTab]);
 
-  // Фильтруем сессии по архиву/текущим
+  // Фильтруем сессии по архиву/текущим на основе серверного статуса
   const PAGE_SIZE = 25;
-  const now = new Date();
-  const filteredSessions = sessions.filter(session => {
-    const sessionEnd = new Date(session.ends_at);
-    // Добавляем 1 час к времени окончания для определения времени архивирования
-    const archiveTime = new Date(sessionEnd.getTime() + 60 * 60 * 1000);
-
-    if (subTab === "current") {
-      // Текущие: время архивирования еще не наступило
-      return now < archiveTime;
-    } else {
-      // Архив: время архивирования наступило
-      return now >= archiveTime;
-    }
-  });
+  const filteredSessions = sessions.filter(session =>
+    subTab === "current"
+      ? session.status !== "completed"
+      : session.status === "completed"
+  );
   const totalPages = Math.ceil(filteredSessions.length / PAGE_SIZE);
   const paginatedSessions = filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

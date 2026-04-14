@@ -31,10 +31,10 @@ class DashboardController extends Controller
         $expiredPending = Booking::with('session')
             ->where('status', 'pending')
             ->get()
-            ->filter(fn($b) => $b->session->ends_at < $now);
+            ->filter(fn($b) => $b->session && $b->session->ends_at < $now);
 
         foreach ($expiredPending as $booking) {
-            $booking->reject(0); // 0 = система
+            $booking->rejectBySystem();
         }
 
         return response()->json([
@@ -258,8 +258,8 @@ class DashboardController extends Controller
         // Автоматически отклонить записи на прошедшие занятия
         foreach ($pendingBookings as $booking) {
             // Если занятие уже прошло, отклоняем запись
-            if ($booking->session->ends_at < $now) {
-                $booking->reject(0); // 0 = система (не конкретный администратор)
+            if ($booking->session && $booking->session->ends_at < $now) {
+                $booking->rejectBySystem();
             }
         }
 

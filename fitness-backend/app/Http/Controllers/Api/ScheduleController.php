@@ -360,8 +360,8 @@ class ScheduleController extends Controller
         $data = [
             'id'         => $session->id,
             'type'       => $session->type,
-            'starts_at'  => $session->starts_at->toDateTimeString(),
-            'ends_at'    => $session->ends_at->toDateTimeString(),
+            'starts_at'  => $session->starts_at->toIso8601String(),
+            'ends_at'    => $session->ends_at->toIso8601String(),
             'date'       => $session->starts_at->toDateString(),
             'time_start' => $session->starts_at->format('H:i'),
             'time_end'   => $session->ends_at->format('H:i'),

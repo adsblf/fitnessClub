@@ -24,8 +24,10 @@ const ACTION_BTNS = [
  *   'done'    – сохранено → маленькая серая кнопка "Редактировать"
  */
 export default function SessionVisitBlock({ session, onUpdated }) {
-  // Уникальный ключ state по id занятия не нужен — компонент живёт пока открыта вкладка
-  const [editingState, setEditingState] = useState("idle");
+  // Если у любого участника уже записано посещение — показываем «отмечено»
+  const [editingState, setEditingState] = useState(() =>
+    session.participants?.some((p) => p.visit_id != null) ? "done" : "idle"
+  );
   // Промежуточные статусы: { [client_id]: 'visited' | 'no_show' | 'late' | 'confirmed' | … }
   const [localStatuses, setLocalStatuses] = useState({});
   const [saving, setSaving] = useState(false);
@@ -127,6 +129,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
     ];
   })();
 
+  const hasAnyVisit = effectiveParticipants.some((p) => p.visit_id != null);
   const isSessionStarted = session.is_editable; // now >= starts_at (server-side)
   const showActionCol = editingState === "editing";
 
@@ -152,7 +155,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
               <span className="inline-flex px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">⏳ Ожидание начала</span>
             ) : editingState === "editing" ? (
               <span className="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">✏️ Идёт заполнение</span>
-            ) : editingState === "done" ? (
+            ) : (editingState === "done" || hasAnyVisit) ? (
               <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 rounded-full text-xs font-medium">✓ Посещаемость отмечена</span>
             ) : (
               <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500 rounded-full text-xs font-medium">Не заполнено</span>
