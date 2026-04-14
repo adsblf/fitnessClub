@@ -16,7 +16,8 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173'], // <-- сюда фронтенд
+    //'allowed_origins' => ['http://localhost:5173'], // <-- сюда фронтенд
+    'allowed_origins' => ['*'], // <-- сюда фронтенд
 
     'allowed_origins_patterns' => [],
 
