@@ -21,7 +21,9 @@ return [
         env('FRONTEND_URL'),
     ]),
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https://.*\.up\.railway\.app$#',
+    ],
 
     'allowed_headers' => ['*'],
 
