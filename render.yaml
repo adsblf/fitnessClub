@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: fitness-backend
+    runtime: php
+    rootDir: fitness-backend
+    buildCommand: composer install --no-dev --optimize-autoloader && php artisan migrate --force
+    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fitness-db
+          property: connectionString
+
+  - type: web
+    name: fitness-frontend
+    runtime: node
+    rootDir: fitness-frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: fitness-backend
+          type: web
+          property: host
+
+  - type: cron
+    name: fitness-scheduler
+    runtime: php
+    rootDir: fitness-backend
+    schedule: "* * * * *"
+    buildCommand: composer install --no-dev
+    startCommand: php artisan schedule:run
+
+databases:
+  - name: fitness-db
+    databaseName: fitness_club
+    plan: free
