@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
 
+    Route::options('{any}', function() {
+        return response()->json([], 200);
+    })->where('any', '.*');
+
     // ── Авторизация (публичные) ────────────────────────
     Route::prefix('auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
