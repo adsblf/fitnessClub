@@ -201,7 +201,7 @@ export default function ClientMembership() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-sm text-zinc-400">Загрузка...</div>
+      <div className="p-4 sm:p-6 text-center text-sm text-zinc-400">Загрузка...</div>
     );
   }
 
@@ -214,7 +214,7 @@ export default function ClientMembership() {
   const isFrozen  = activeMembership?.status === "frozen";
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-3xl">
       <div>
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Абонемент</h1>
         <p className="text-sm text-zinc-400 mt-0.5">Управляйте своим абонементом и просматривайте историю посещений</p>

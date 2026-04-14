@@ -93,8 +93,8 @@ export default function AdminPendingBookings() {
 
     if (loading) {
         return (
-            <div className="p-6">
-                <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
+            <div className="p-4 sm:p-6">
+                <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
                     Записи на подтверждение
                 </h1>
                 <div className="text-center py-12 text-zinc-400">Загрузка...</div>
@@ -103,8 +103,8 @@ export default function AdminPendingBookings() {
     }
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
+        <div className="p-4 sm:p-6">
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
                 Записи на подтверждение
             </h1>
 
@@ -122,9 +122,9 @@ export default function AdminPendingBookings() {
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Таблица записей */}
-                    <div className="col-span-2 overflow-x-auto">
+                    <div className="lg:col-span-2 overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-zinc-200 dark:border-zinc-800">

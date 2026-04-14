@@ -8,7 +8,7 @@ export default function AdminVisits() {
   const [activeTab, setActiveTab] = useState("group"); // 'group', 'personal', 'checkin'
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 sm:p-6 space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
           Посещения
@@ -16,7 +16,7 @@ export default function AdminVisits() {
       </div>
 
       {/* Вкладки */}
-      <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         <button
           onClick={() => setActiveTab("group")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -139,7 +139,7 @@ function GroupSessionsTab() {
   return (
     <div className="space-y-4">
       {/* Подвкладки */}
-      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         <button
           onClick={() => setSubTab("current")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -339,7 +339,7 @@ function PersonalSessionsTab() {
   return (
     <div className="space-y-4">
       {/* Подвкладки */}
-      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         <button
           onClick={() => setSubTab("current")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${

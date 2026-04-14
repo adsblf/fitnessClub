@@ -80,8 +80,8 @@ export default function OwnerStaff() {
   });
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
+    <div className="p-4 sm:p-6 space-y-5 max-w-5xl">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Персонал</h1>
           <p className="text-xs text-zinc-400 mt-0.5">Администраторы и тренеры</p>
@@ -95,7 +95,7 @@ export default function OwnerStaff() {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Поиск по имени или email…"
-          className="px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none w-64"
+          className="px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none w-full sm:w-64"
         />
         <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
           {[["all","Все"],["admin","Администраторы"],["trainer","Тренеры"]].map(([v, l]) => (
@@ -106,7 +106,7 @@ export default function OwnerStaff() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-sm text-zinc-400">Загрузка...</div>
         ) : filtered.length === 0 ? (

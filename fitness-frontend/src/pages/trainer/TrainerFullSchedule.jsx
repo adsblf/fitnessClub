@@ -138,8 +138,8 @@ export default function TrainerFullSchedule() {
     : sessions;
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="p-4 sm:p-6 space-y-4">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Расписание</h1>
         <button
           onClick={() => setShowCreate(true)}
@@ -234,7 +234,7 @@ export default function TrainerFullSchedule() {
       </div>
 
       {/* Таблица */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-sm text-zinc-400">Загрузка...</div>
         ) : visibleSessions.length === 0 ? (

@@ -1,27 +1,29 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 
 const adminNav = [
-  { to: "/admin",                   label: "Дашборд",            icon: "📊" },
-  { to: "/admin/clients",           label: "Клиенты",            icon: "👥" },
-  { to: "/admin/schedule",          label: "Расписание",         icon: "📅" },
-  { to: "/admin/memberships",       label: "Абонементы",         icon: "🎫" },
-  { to: "/admin/sales",             label: "Продажи",            icon: "💰" },
-  { to: "/admin/visits",            label: "Посещения",          icon: "✅" },
-  { to: "/admin/pending-bookings",  label: "Ожидающие записи",  icon: "⏳" },
+  { to: "/admin",                   label: "Дашборд",           icon: "📊" },
+  { to: "/admin/clients",           label: "Клиенты",           icon: "👥" },
+  { to: "/admin/schedule",          label: "Расписание",        icon: "📅" },
+  { to: "/admin/memberships",       label: "Абонементы",        icon: "🎫" },
+  { to: "/admin/sales",             label: "Продажи",           icon: "💰" },
+  { to: "/admin/visits",            label: "Посещения",         icon: "✅" },
+  { to: "/admin/pending-bookings",  label: "Ожидающие записи", icon: "⏳" },
 ];
 
 const ownerNav = [
-  { to: "/admin/owner/staff",             label: "Персонал",    icon: "👤" },
-  { to: "/admin/owner/membership-types",  label: "Тарифы",      icon: "📋" },
-  { to: "/admin/owner/promo-codes",       label: "Промокоды",   icon: "🏷️" },
+  { to: "/admin/owner/staff",             label: "Персонал",  icon: "👤" },
+  { to: "/admin/owner/membership-types",  label: "Тарифы",    icon: "📋" },
+  { to: "/admin/owner/promo-codes",       label: "Промокоды", icon: "🏷️" },
 ];
 
-function NavItem({ to, label, icon, exact = false }) {
+function NavItem({ to, label, icon, exact = false, onClick }) {
   return (
     <NavLink
       to={to}
       end={exact}
+      onClick={onClick}
       className={({ isActive }) =>
         `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
           isActive
@@ -39,18 +41,44 @@ function NavItem({ to, label, icon, exact = false }) {
 export default function AdminLayout() {
   const { user, logout, hasRole } = useAuth();
   const isOwner = hasRole("owner");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
-    <div className="flex h-screen bg-zinc-100 dark:bg-zinc-950">
-      <aside className="w-56 shrink-0 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
-        <div className="px-5 py-5 border-b border-zinc-200 dark:border-zinc-800">
-          <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">FitClub</div>
-          <div className="text-xs text-zinc-400 mt-0.5">{isOwner ? "Панель владельца" : "Панель администратора"}</div>
+    <div className="flex h-screen bg-zinc-100 dark:bg-zinc-950 overflow-hidden">
+      {/* Mobile backdrop */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={closeMenu}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 transition-transform duration-200 md:static md:w-56 md:translate-x-0 md:z-auto md:shrink-0 ${
+          menuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="px-5 py-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">FitClub</div>
+            <div className="text-xs text-zinc-400 mt-0.5">{isOwner ? "Панель владельца" : "Панель администратора"}</div>
+          </div>
+          <button
+            onClick={closeMenu}
+            className="md:hidden p-1.5 rounded-md text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {adminNav.map(item => (
-            <NavItem key={item.to} to={item.to} label={item.label} icon={item.icon} exact={item.to === "/admin"} />
+            <NavItem key={item.to} to={item.to} label={item.label} icon={item.icon} exact={item.to === "/admin"} onClick={closeMenu} />
           ))}
 
           {isOwner && (
@@ -59,7 +87,7 @@ export default function AdminLayout() {
                 Управление
               </div>
               {ownerNav.map(item => (
-                <NavItem key={item.to} to={item.to} label={item.label} icon={item.icon} />
+                <NavItem key={item.to} to={item.to} label={item.label} icon={item.icon} onClick={closeMenu} />
               ))}
             </>
           )}
@@ -81,9 +109,25 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+      {/* Content area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+          <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">FitClub</span>
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="p-2 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

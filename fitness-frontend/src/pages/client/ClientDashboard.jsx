@@ -92,8 +92,8 @@ export default function ClientDashboard() {
   };
 
   return (
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="p-4 sm:p-6 space-y-6">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <div>
             <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Привет, {firstName}!
@@ -109,9 +109,9 @@ export default function ClientDashboard() {
         </div>
 
         {/* Абонемент и карточка клиента */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Информация об абонементе */}
-          <div className="col-span-1">
+          <div className="col-span-1 md:col-span-1">
             {m ? (
                 <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-100 dark:to-zinc-200 text-white dark:text-zinc-900 rounded-xl p-6 flex flex-col gap-4 shadow-lg">
                   <div className="flex justify-between items-start">
@@ -152,10 +152,10 @@ export default function ClientDashboard() {
           </div>
 
           {/* Карточка клиента */}
-          <div className="col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
+          <div className="col-span-1 md:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
             <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">Личная информация</div>
             {profile.card ? (
-                <div className="grid grid-cols-4 gap-3 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3">
                     <div className="text-xs text-zinc-400 mb-0.5 font-medium">Цель тренировок</div>
                     <div className="text-zinc-800 dark:text-zinc-200 font-semibold">{profile.card.training_goal}</div>
@@ -239,7 +239,7 @@ export default function ClientDashboard() {
         </div>
 
         {/* Статистика посещаемости */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl p-5">
             <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-1">Всего посещений</div>
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{visitStats.total}</div>
@@ -258,7 +258,7 @@ export default function ClientDashboard() {
         </div>
 
         {/* История посещений */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-x-auto">
           <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
             <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">История последних посещений</div>
           </div>

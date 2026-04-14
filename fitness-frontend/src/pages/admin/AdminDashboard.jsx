@@ -137,7 +137,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="text-sm text-zinc-400">Загрузка дашборда...</div>
       </div>
     );
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="text-sm text-red-500">{error}</div>
       </div>
     );
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
   const totalMembershipStatuses = (stats.membership_status_breakdown ?? []).reduce((s, i) => s + i.count, 0);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Заголовок */}
       <div>
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Дашборд</h1>

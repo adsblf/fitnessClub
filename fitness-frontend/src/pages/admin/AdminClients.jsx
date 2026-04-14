@@ -49,8 +49,8 @@ export default function AdminClients() {
   }, [fetchClients]);
 
   return (
-      <div className="p-6 space-y-4">
-        <div className="flex justify-between items-center">
+      <div className="p-4 sm:p-4 sm:p-6 space-y-4">
+        <div className="flex flex-wrap justify-between items-center gap-3ems-center gap-3">
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Клиенты</h1>
           <button
               onClick={() => setShowCreate(true)}
@@ -65,10 +65,10 @@ export default function AdminClients() {
             placeholder="Поиск по ФИО, телефону, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full max-w-md px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-400"
+            className="w-full sm:sm:max-w-md px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-400"
         />
 
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto overflow-x-auto">
           {loading ? (
               <div className="p-8 text-center text-sm text-zinc-400">Загрузка...</div>
           ) : clients.length === 0 ? (

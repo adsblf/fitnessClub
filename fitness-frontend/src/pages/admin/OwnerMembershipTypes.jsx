@@ -61,8 +61,8 @@ export default function OwnerMembershipTypes() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl">
-      <div className="flex items-center justify-between gap-4">
+    <div className="p-4 sm:p-6 space-y-5 max-w-4xl">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Тарифные планы</h1>
           <p className="text-xs text-zinc-400 mt-0.5">Создание, редактирование и деактивация абонементов</p>
@@ -72,7 +72,7 @@ export default function OwnerMembershipTypes() {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-sm text-zinc-400">Загрузка...</div>
         ) : types.length === 0 ? (

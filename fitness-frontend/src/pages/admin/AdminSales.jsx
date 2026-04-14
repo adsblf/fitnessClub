@@ -221,7 +221,7 @@ export default function AdminSales() {
   const totalPages = meta?.last_page ?? 1;
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl">
+    <div className="p-4 sm:p-6 space-y-5 max-w-7xl">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -353,7 +353,7 @@ export default function AdminSales() {
             )}
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
             {loading ? (
               <div className="p-8 text-center text-sm text-zinc-400">Загрузка...</div>
             ) : data.length === 0 ? (
