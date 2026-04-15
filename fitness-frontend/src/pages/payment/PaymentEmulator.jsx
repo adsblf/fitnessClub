@@ -90,9 +90,13 @@ export default function PaymentEmulator() {
             {isSuccess
               ? (payment.purpose === "balance_topup"
                   ? "Баланс успешно пополнен. Вернитесь в личный кабинет."
+                  : payment.purpose === "product_sale"
+                  ? "Продажа оформлена. Вернитесь в кабинет администратора."
                   : "Абонемент активирован. Вернитесь в кабинет администратора.")
               : (payment.purpose === "balance_topup"
                   ? "Пополнение отменено. Вернитесь в личный кабинет."
+                  : payment.purpose === "product_sale"
+                  ? "Продажа отменена. Вернитесь в кабинет администратора."
                   : "Абонемент отменён. Вернитесь в кабинет администратора для повторного оформления.")}
           </p>
           <div className="text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3 mb-4">
@@ -129,7 +133,7 @@ export default function PaymentEmulator() {
             <span className="w-6 h-px bg-zinc-300 dark:bg-zinc-700"></span>
           </div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mt-3">
-            {payment.purpose === "balance_topup" ? "Пополнение баланса" : "Оплата абонемента"}
+            {payment.purpose === "balance_topup" ? "Пополнение баланса" : payment.purpose === "product_sale" ? "Оплата товаров" : "Оплата абонемента"}
           </h1>
         </div>
 
@@ -138,6 +142,8 @@ export default function PaymentEmulator() {
           <Row label="Клиент" value={payment.client_name ?? "—"} />
           {payment.purpose === "balance_topup"
             ? <Row label="Операция" value="Пополнение баланса" />
+            : payment.purpose === "product_sale"
+            ? <Row label="Позиций" value={payment.product_sale_items_count != null ? `${payment.product_sale_items_count} шт.` : "Товары/услуги"} />
             : <Row label="Абонемент" value={payment.membership_type ?? "—"} />
           }
           <Row label="Способ оплаты" value={methodLabel} />

@@ -20,9 +20,11 @@ import AdminMemberships from "./pages/admin/AdminMemberships";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminPendingBookings from "./pages/admin/AdminPendingBookings";
 import AdminSales from "./pages/admin/AdminSales";
+import AdminProductSales from "./pages/admin/AdminProductSales";
 import OwnerStaff from "./pages/admin/OwnerStaff";
 import OwnerMembershipTypes from "./pages/admin/OwnerMembershipTypes";
 import OwnerPromoCodes from "./pages/admin/OwnerPromoCodes";
+import OwnerProducts from "./pages/admin/OwnerProducts";
 
 // Client pages
 import ClientDashboard from "./pages/client/ClientDashboard";
@@ -96,9 +98,11 @@ export default function App() {
                             <Route path="visits" element={<AdminVisits />} />
                             <Route path="pending-bookings" element={<AdminPendingBookings />} />
                             <Route path="sales" element={<AdminSales />} />
+                            <Route path="shop" element={<AdminProductSales />} />
                             <Route path="owner/staff" element={<OwnerStaff />} />
                             <Route path="owner/membership-types" element={<OwnerMembershipTypes />} />
                             <Route path="owner/promo-codes" element={<OwnerPromoCodes />} />
+                            <Route path="owner/products" element={<OwnerProducts />} />
                         </Route>
                     </Route>
 

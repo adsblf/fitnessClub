@@ -8,6 +8,7 @@ const adminNav = [
   { to: "/admin/schedule",          label: "Расписание",        icon: "📅" },
   { to: "/admin/memberships",       label: "Абонементы",        icon: "🎫" },
   { to: "/admin/sales",             label: "Продажи",           icon: "💰" },
+  { to: "/admin/shop",              label: "Магазин",           icon: "🛒" },
   { to: "/admin/visits",            label: "Посещения",         icon: "✅" },
   { to: "/admin/pending-bookings",  label: "Ожидающие записи", icon: "⏳" },
 ];
@@ -16,6 +17,7 @@ const ownerNav = [
   { to: "/admin/owner/staff",             label: "Персонал",  icon: "👤" },
   { to: "/admin/owner/membership-types",  label: "Тарифы",    icon: "📋" },
   { to: "/admin/owner/promo-codes",       label: "Промокоды", icon: "🏷️" },
+  { to: "/admin/owner/products",          label: "Товары",    icon: "📦" },
 ];
 
 function NavItem({ to, label, icon, exact = false, onClick }) {

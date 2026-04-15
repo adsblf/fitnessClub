@@ -8,6 +8,8 @@ use App\Models\Client;
 use App\Models\Membership;
 use App\Models\MembershipType;
 use App\Models\Payment;
+use App\Models\Product;
+use App\Models\ProductSale;
 use App\Models\PromoCode;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -259,7 +261,7 @@ class MembershipController extends Controller
      */
     public function paymentStatus(int $id): JsonResponse
     {
-        $payment = Payment::with(['membership.membershipType', 'client.person'])->findOrFail($id);
+        $payment = Payment::with(['membership.membershipType', 'client.person', 'productSale.items'])->findOrFail($id);
 
         return response()->json([
             'data' => [
@@ -273,6 +275,7 @@ class MembershipController extends Controller
                 'client_name'    => $payment->client?->person?->full_name,
                 'membership_type' => $payment->membership?->membershipType?->name,
                 'membership_status' => $payment->membership?->status,
+                'product_sale_items_count' => $payment->productSale?->items?->count(),
             ],
         ]);
     }
@@ -300,6 +303,25 @@ class MembershipController extends Controller
                 'message' => 'Платёж уже обработан',
                 'payment_status' => $payment->status,
             ], 409);
+        }
+
+        // ── Продажа товаров ───────────────────────────────────────────────
+        if ($payment->purpose === 'product_sale') {
+            if ($data['success']) {
+                $payment->update(['status' => 'success', 'paid_at' => now()]);
+                ProductSale::where('id', $payment->product_sale_id)->update(['status' => 'success']);
+                return response()->json(['message' => 'Продажа оформлена', 'success' => true]);
+            }
+            // Отмена: восстанавливаем остатки
+            $sale = ProductSale::with('items')->find($payment->product_sale_id);
+            if ($sale) {
+                foreach ($sale->items as $item) {
+                    Product::where('id', $item->product_id)->increment('stock_quantity', $item->quantity);
+                }
+                $sale->update(['status' => 'cancelled']);
+            }
+            $payment->update(['status' => 'cancelled']);
+            return response()->json(['message' => 'Оплата отменена', 'success' => false]);
         }
 
         // ── Пополнение баланса ────────────────────────────────────────

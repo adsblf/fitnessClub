@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Membership;
 use App\Models\MembershipType;
 use App\Models\Payment;
+use App\Models\ProductSale;
 use App\Models\Visit;
 use App\Models\Booking;
 use App\Models\Session;
@@ -42,12 +43,14 @@ class DashboardController extends Controller
                 // Выручка сегодня (за вычетом возвратов)
                 'revenue_today' => Payment::whereDate('paid_at', $today)
                     ->whereIn('status', ['success', 'refund'])
-                    ->sum('amount'),
+                    ->sum('amount')
+                    + $this->productRevenue($today, $today),
 
                 // Выручка за месяц (за вычетом возвратов)
                 'revenue_month' => Payment::whereDate('paid_at', '>=', $monthStart)
                     ->whereIn('status', ['success', 'refund'])
-                    ->sum('amount'),
+                    ->sum('amount')
+                    + $this->productRevenue($monthStart),
 
                 // Посещений сегодня
                 'visits_today' => Visit::whereDate('visited_at', $today)->count(),
@@ -110,7 +113,11 @@ class DashboardController extends Controller
                 'revenue_last_month' => Payment::whereDate('paid_at', '>=', now()->subMonth()->startOfMonth()->toDateString())
                     ->whereDate('paid_at', '<', $monthStart)
                     ->whereIn('status', ['success', 'refund'])
-                    ->sum('amount'),
+                    ->sum('amount')
+                    + $this->productRevenue(
+                        now()->subMonth()->startOfMonth()->toDateString(),
+                        now()->subMonth()->endOfMonth()->toDateString()
+                    ),
             ],
         ]);
     }
@@ -132,17 +139,38 @@ class DashboardController extends Controller
 
     private function revenuePerDay(int $days): array
     {
+        // Собираем товарную выручку по дням одним запросом
+        $productByDay = ProductSale::selectRaw('DATE(paid_at) as day, SUM(total_amount) as amount')
+            ->whereDate('paid_at', '>=', now()->subDays($days - 1)->toDateString())
+            ->groupBy('day')
+            ->pluck('amount', 'day')
+            ->all();
+
         $result = [];
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->toDateString();
+            $membershipRev = (float) Payment::whereDate('paid_at', $date)
+                ->whereIn('status', ['success', 'refund'])
+                ->sum('amount');
+            $productRev = (float) ($productByDay[$date] ?? 0);
             $result[] = [
                 'date'   => $date,
-                'amount' => (float) Payment::whereDate('paid_at', $date)
-                    ->whereIn('status', ['success', 'refund'])
-                    ->sum('amount'),
+                'amount' => round($membershipRev + $productRev, 2),
             ];
         }
         return $result;
+    }
+
+    /**
+     * Суммарная выручка от продажи товаров за диапазон дат (net: продажи минус возвраты).
+     */
+    private function productRevenue(string $dateFrom, ?string $dateTo = null): float
+    {
+        $q = ProductSale::whereDate('paid_at', '>=', $dateFrom);
+        if ($dateTo) {
+            $q->whereDate('paid_at', '<=', $dateTo);
+        }
+        return (float) $q->sum('total_amount');
     }
 
     private function membershipStatusBreakdown(): array

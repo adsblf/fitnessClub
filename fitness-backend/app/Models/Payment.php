@@ -16,6 +16,7 @@ class Payment extends Model
         'client_id',
         'membership_id',
         'personal_session_id',
+        'product_sale_id',
         'purpose',
         'promo_code_id',
         'amount',
@@ -43,6 +44,11 @@ class Payment extends Model
     public function membership()
     {
         return $this->belongsTo(Membership::class);
+    }
+
+    public function productSale()
+    {
+        return $this->belongsTo(ProductSale::class);
     }
 
     public function promoCode()

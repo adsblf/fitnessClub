@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MembershipController;
 use App\Http\Controllers\Api\OwnerController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\TrainerClientController;
 use App\Http\Controllers\Api\VisitController;
@@ -54,6 +55,17 @@ Route::prefix('v1')->group(function () {
 
         Route::get('sales', [DashboardController::class, 'salesHistory'])
             ->middleware('role:admin,owner');
+
+        // ── Товары (POS — список для продажи) ─────────────────────────
+        Route::get('products', [ProductController::class, 'listForSale'])
+            ->middleware('role:admin,owner');
+
+        // Продажи товаров
+        Route::prefix('product-sales')->middleware('role:admin,owner')->group(function () {
+            Route::get('/',             [ProductController::class, 'listSales']);
+            Route::post('/',            [ProductController::class, 'createSale']);
+            Route::post('/{id}/refund', [ProductController::class, 'refundSale']);
+        });
 
         // Клиенты — CRUD
         Route::prefix('clients')->group(function () {
@@ -170,6 +182,18 @@ Route::prefix('v1')->group(function () {
             Route::post('promo-codes',         [OwnerController::class, 'storePromoCode']);
             Route::put('promo-codes/{id}',     [OwnerController::class, 'updatePromoCode']);
             Route::delete('promo-codes/{id}',  [OwnerController::class, 'destroyPromoCode']);
+
+            // Каталог товаров
+            Route::get('product-categories',          [ProductController::class, 'indexCategories']);
+            Route::post('product-categories',         [ProductController::class, 'storeCategory']);
+            Route::put('product-categories/{id}',     [ProductController::class, 'updateCategory']);
+            Route::delete('product-categories/{id}',  [ProductController::class, 'destroyCategory']);
+
+            Route::get('products',               [ProductController::class, 'index']);
+            Route::post('products',              [ProductController::class, 'store']);
+            Route::put('products/{id}',          [ProductController::class, 'update']);
+            Route::delete('products/{id}',       [ProductController::class, 'destroy']);
+            Route::post('products/{id}/restock', [ProductController::class, 'restock']);
         });
     });
 });
