@@ -10,7 +10,7 @@ const ROLE_COLORS = {
 const INPUT = "w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-900 dark:focus:border-zinc-100";
 
 function emptyForm(role = "admin") {
-  return { role, full_name: "", email: "", phone: "", password: "", position: "", specialization: "", description: "" };
+  return { role, full_name: "", email: "", phone: "", password: "", position: "", specialization: "", description: "", hourly_rate: "" };
 }
 
 export default function OwnerStaff() {
@@ -41,6 +41,7 @@ export default function OwnerStaff() {
       role: s.role, full_name: s.full_name ?? "", email: s.email ?? "",
       phone: s.phone ?? "", password: "", position: s.position ?? "",
       specialization: s.specialization ?? "", description: s.description ?? "",
+      hourly_rate: s.hourly_rate != null ? String(s.hourly_rate) : "",
     });
     setError(null);
     setModal({ mode: "edit", id: s.id });
@@ -55,7 +56,9 @@ export default function OwnerStaff() {
       const payload = { ...form };
       if (!payload.password) delete payload.password;
       if (payload.role !== "admin")   delete payload.position;
-      if (payload.role !== "trainer") { delete payload.specialization; delete payload.description; }
+      if (payload.role !== "trainer") { delete payload.specialization; delete payload.description; delete payload.hourly_rate; }
+      if (payload.hourly_rate === "") payload.hourly_rate = null;
+      if (payload.hourly_rate !== null) payload.hourly_rate = Number(payload.hourly_rate);
       if (modal.mode === "add") await ownerApi.storeStaff(payload);
       else                      await ownerApi.updateStaff(modal.id, payload);
       setModal(null); load();
@@ -141,6 +144,7 @@ export default function OwnerStaff() {
                   <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">
                     {s.position       && <div>Должность: {s.position}</div>}
                     {s.specialization && <div>Специализация: {s.specialization}</div>}
+                    {s.hourly_rate != null && <div>Ставка: {Number(s.hourly_rate).toLocaleString("ru-RU")} ₽/ч</div>}
                     {s.description    && <div className="truncate max-w-[180px]">{s.description}</div>}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -194,6 +198,9 @@ export default function OwnerStaff() {
               <>
                 <Field label="Специализация">
                   <input value={form.specialization} onChange={e => set("specialization", e.target.value)} className={INPUT} placeholder="Йога, пилатес" />
+                </Field>
+                <Field label="Стоимость, ₽/час">
+                  <input value={form.hourly_rate} onChange={e => set("hourly_rate", e.target.value)} type="number" min="0" step="100" className={INPUT} placeholder="3000" />
                 </Field>
                 <Field label="Описание">
                   <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={3} className={`${INPUT} resize-none`} placeholder="Биография тренера" />

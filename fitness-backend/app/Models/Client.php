@@ -27,12 +27,14 @@ class Client extends Model
         'person_id',
         'registration_date',
         'status',
+        'balance',
     ];
 
     protected function casts(): array
     {
         return [
             'registration_date' => 'date',
+            'balance'           => 'decimal:2',
         ];
     }
 

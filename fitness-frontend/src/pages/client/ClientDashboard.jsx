@@ -136,6 +136,12 @@ export default function ClientDashboard() {
                         {m.remaining_visits >= 999 ? "Безлимит ∞" : m.remaining_visits}
                       </span>
                     </div>
+                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-white/10 dark:border-zinc-900/20">
+                      <span className="text-sm opacity-70">Баланс</span>
+                      <span className="font-semibold text-base text-emerald-300">
+                        {Number(profile.balance ?? 0).toLocaleString("ru-RU")} ₽
+                      </span>
+                    </div>
                   </div>
                 </div>
             ) : (

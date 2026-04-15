@@ -88,8 +88,12 @@ export default function PaymentEmulator() {
           </h1>
           <p className="text-sm text-zinc-500 mb-6">
             {isSuccess
-              ? "Абонемент активирован. Вернитесь в кабинет администратора."
-              : "Абонемент отменён. Вернитесь в кабинет администратора для повторного оформления."}
+              ? (payment.purpose === "balance_topup"
+                  ? "Баланс успешно пополнен. Вернитесь в личный кабинет."
+                  : "Абонемент активирован. Вернитесь в кабинет администратора.")
+              : (payment.purpose === "balance_topup"
+                  ? "Пополнение отменено. Вернитесь в личный кабинет."
+                  : "Абонемент отменён. Вернитесь в кабинет администратора для повторного оформления.")}
           </p>
           <div className="text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3 mb-4">
             <div>Транзакция: <span className="font-mono">{payment.transaction_id}</span></div>
@@ -125,14 +129,17 @@ export default function PaymentEmulator() {
             <span className="w-6 h-px bg-zinc-300 dark:bg-zinc-700"></span>
           </div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mt-3">
-            Оплата абонемента
+            {payment.purpose === "balance_topup" ? "Пополнение баланса" : "Оплата абонемента"}
           </h1>
         </div>
 
         {/* Чек */}
         <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 mb-6 space-y-2.5 text-sm">
           <Row label="Клиент" value={payment.client_name ?? "—"} />
-          <Row label="Абонемент" value={payment.membership_type ?? "—"} />
+          {payment.purpose === "balance_topup"
+            ? <Row label="Операция" value="Пополнение баланса" />
+            : <Row label="Абонемент" value={payment.membership_type ?? "—"} />
+          }
           <Row label="Способ оплаты" value={methodLabel} />
           <Row label="Транзакция" value={<span className="font-mono text-xs">{payment.transaction_id}</span>} />
           <div className="pt-2 mt-2 border-t border-zinc-200 dark:border-zinc-700">

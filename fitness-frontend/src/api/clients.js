@@ -28,4 +28,7 @@ export const clientsApi = {
     credentials(id) {
         return api.get(`/clients/${id}/credentials`);
     },
+    topupBalance(id, data) {
+        return api.post(`/clients/${id}/balance/topup`, data);
+    },
 };

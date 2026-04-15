@@ -267,6 +267,7 @@ class MembershipController extends Controller
                 'amount'         => $payment->amount,
                 'method'         => $payment->payment_method,
                 'status'         => $payment->status,
+                'purpose'        => $payment->purpose ?? 'membership',
                 'transaction_id' => $payment->transaction_id,
                 'membership_id'  => $payment->membership_id,
                 'client_name'    => $payment->client?->person?->full_name,
@@ -292,7 +293,7 @@ class MembershipController extends Controller
             'success' => 'required|boolean',
         ]);
 
-        $payment = Payment::with(['membership.membershipType', 'membership.client.person.user'])->findOrFail($id);
+        $payment = Payment::with(['membership.membershipType', 'membership.client.person.user', 'client'])->findOrFail($id);
 
         if ($payment->status !== 'pending') {
             return response()->json([
@@ -301,6 +302,21 @@ class MembershipController extends Controller
             ], 409);
         }
 
+        // ── Пополнение баланса ────────────────────────────────────────
+        if (($payment->purpose ?? 'membership') === 'balance_topup') {
+            if ($data['success']) {
+                $payment->update(['status' => 'success', 'paid_at' => now()]);
+                $client = $payment->client ?? Client::find($payment->client_id);
+                if ($client) {
+                    $client->increment('balance', $payment->amount);
+                }
+                return response()->json(['message' => 'Баланс пополнен', 'success' => true]);
+            }
+            $payment->update(['status' => 'cancelled']);
+            return response()->json(['message' => 'Пополнение отменено', 'success' => false]);
+        }
+
+        // ── Оплата абонемента ─────────────────────────────────────────
         $membership = $payment->membership;
         if (!$membership) {
             return response()->json(['message' => 'Абонемент не найден'], 404);

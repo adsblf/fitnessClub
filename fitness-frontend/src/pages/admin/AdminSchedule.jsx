@@ -13,6 +13,15 @@ function timeOverlap(s, startsAt, endsAt, excludeId = null) {
   return sStart < nEnd && sEnd > nStart;
 }
 
+// Рассчитывает стоимость сессии по ставке тренера
+function calcSessionCost(trainer, startsAt, endsAt) {
+  if (!trainer?.hourly_rate || !startsAt || !endsAt) return 0;
+  const diffMs = new Date(endsAt) - new Date(startsAt);
+  if (diffMs <= 0) return 0;
+  const hours = diffMs / 3600000;
+  return Math.round(Number(trainer.hourly_rate) * hours * 100) / 100;
+}
+
 const STATUS_MAP = {
   scheduled:   { label: "Запланировано", cls: "bg-blue-100 text-blue-700" },
   in_progress: { label: "Идёт",         cls: "bg-amber-100 text-amber-700" },
@@ -316,6 +325,7 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
     trainer_id: "",
     max_participants: 15,
     difficulty_level: "Начальный",
+    payment_method: "cash",
   });
   const [selectedClient, setSelectedClient] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -362,7 +372,9 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
       const data = { ...form };
       if (data.hall_id) data.hall_id = Number(data.hall_id);
       if (data.trainer_id) data.trainer_id = Number(data.trainer_id);
-      if (form.type === "personal") data.client_id = selectedClient.person_id;
+      if (form.type === "personal") {
+        data.client_id = selectedClient.person_id;
+      }
       data.max_participants = Number(data.max_participants);
       await scheduleApi.create(data);
       onCreated();
@@ -426,23 +438,58 @@ function CreateSessionModal({ halls, trainers, onClose, onCreated }) {
             )}
 
             {form.type === "personal" && (
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">Клиент</label>
-                <ClientSearchAutocomplete
-                  onSelect={setSelectedClient}
-                  placeholder="Поиск по ФИО..."
-                />
-                {selectedClient && (
-                  <div className="mt-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 text-sm">
-                    <span className="font-medium text-emerald-900 dark:text-emerald-100">{selectedClient.full_name}</span>
-                    {selectedClient.active_membership && (
-                      <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">
-                        {selectedClient.remaining_visits} визитов
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+              <>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Клиент</label>
+                  <ClientSearchAutocomplete
+                    onSelect={setSelectedClient}
+                    placeholder="Поиск по ФИО..."
+                  />
+                  {selectedClient && (
+                    <div className="mt-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 text-sm">
+                      <span className="font-medium text-emerald-900 dark:text-emerald-100">{selectedClient.full_name}</span>
+                      {selectedClient.active_membership && (
+                        <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">
+                          {selectedClient.remaining_visits} визитов
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Стоимость и способ оплаты */}
+                {(() => {
+                  const trainer = trainers.find(t => t.id === Number(form.trainer_id));
+                  const cost = calcSessionCost(trainer, form.starts_at, form.ends_at);
+                  return (
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg space-y-2.5">
+                      {trainer?.hourly_rate ? (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-zinc-500">Стоимость ({trainer.hourly_rate} ₽/ч)</span>
+                          <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {cost > 0 ? `${cost.toLocaleString("ru-RU")} ₽` : "—"}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-zinc-400">Ставка тренера не задана — стоимость: 0 ₽</div>
+                      )}
+                      <div>
+                        <label className="block text-xs text-zinc-500 mb-1">Способ оплаты</label>
+                        <select
+                          value={form.payment_method}
+                          onChange={set("payment_method")}
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+                        >
+                          <option value="balance">Баланс клиента</option>
+                          <option value="cash">Наличные</option>
+                          <option value="card_terminal">Терминал</option>
+                          <option value="online_sbp">СБП</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
             )}
 
             <InputField label="Начало (дата и время)" type="datetime-local" required value={form.starts_at} onChange={set("starts_at")} />

@@ -8,9 +8,11 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\GroupSession;
 use App\Models\Hall;
+use App\Models\Payment;
 use App\Models\PersonalSession;
 use App\Models\Session;
 use App\Models\Trainer;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -110,6 +112,29 @@ class ScheduleController extends Controller
     {
         $data = $request->validated();
 
+        // ── Проверки для персонального занятия ──────────────────────────
+        if (($data['type'] ?? null) === 'personal' && isset($data['client_id'])) {
+            $clientForCheck = Client::with('memberships')->findOrFail($data['client_id']);
+
+            // Требуем активный абонемент
+            if (!$clientForCheck->getActiveMembership()) {
+                return response()->json([
+                    'message' => 'У клиента нет активного абонемента. Запись на персональное занятие невозможна.',
+                ], 422);
+            }
+
+            // Проверка баланса при оплате с баланса
+            $paymentMethod = $data['payment_method'] ?? 'cash';
+            if ($paymentMethod === 'balance') {
+                $sessionCost = $this->calcSessionCost($data);
+                if ((float) $clientForCheck->balance < $sessionCost) {
+                    return response()->json([
+                        'message' => "Недостаточно средств на балансе. Баланс: {$clientForCheck->balance} ₽, стоимость: {$sessionCost} ₽",
+                    ], 422);
+                }
+            }
+        }
+
         // Проверка конфликтов по залу
         if (isset($data['hall_id'])) {
             $conflict = Session::where('hall_id', $data['hall_id'])
@@ -190,10 +215,31 @@ class ScheduleController extends Controller
                 'max_participants' => $data['max_participants'],
             ]);
         } else {
+            $client = Client::findOrFail($data['client_id']);
+            $paymentMethod = $data['payment_method'] ?? 'cash';
+            $sessionCost   = $this->calcSessionCost($data);
+
             PersonalSession::create([
                 'session_id' => $session->id,
                 'client_id'  => $data['client_id'],
             ]);
+
+            // Фиксируем платёж за персональное занятие
+            Payment::create([
+                'client_id'           => $data['client_id'],
+                'personal_session_id' => $session->id,
+                'purpose'             => 'personal_session',
+                'amount'              => $sessionCost,
+                'paid_at'             => now(),
+                'payment_method'      => $paymentMethod,
+                'status'              => 'success',
+                'transaction_id'      => 'TXN-' . strtoupper(uniqid()),
+            ]);
+
+            // Списываем с баланса клиента
+            if ($paymentMethod === 'balance' && $sessionCost > 0) {
+                $client->decrement('balance', $sessionCost);
+            }
         }
 
         $session->load(['hall', 'trainer.person', 'groupSession', 'personalSession.client.person']);
@@ -326,8 +372,27 @@ class ScheduleController extends Controller
                 'specialization' => $t->specialization,
                 'phone'          => $t->contact_phone,
                 'description'    => $t->description,
+                'hourly_rate'    => $t->hourly_rate,
             ]),
         ]);
+    }
+
+    /**
+     * Рассчитывает стоимость персональной сессии по ставке тренера и её длительности.
+     */
+    private function calcSessionCost(array $data): float
+    {
+        if (empty($data['trainer_id'])) {
+            return 0.0;
+        }
+        $trainer = Trainer::find($data['trainer_id']);
+        if (!$trainer || !$trainer->hourly_rate) {
+            return 0.0;
+        }
+        $starts = Carbon::parse($data['starts_at']);
+        $ends   = Carbon::parse($data['ends_at']);
+        $hours  = $ends->diffInMinutes($starts) / 60;
+        return round((float) $trainer->hourly_rate * $hours, 2);
     }
 
     /**

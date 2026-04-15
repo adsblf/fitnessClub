@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ClientRequest;
 use App\Models\Client;
+use App\Models\Payment;
 use App\Models\Person;
 use App\Models\Role;
 use App\Models\User;
@@ -232,6 +233,61 @@ class ClientController extends Controller
     }
 
     /**
+     * POST /api/v1/clients/{id}/balance/topup
+     * Пополнение баланса клиента.
+     *
+     * Для online_sbp / card_terminal — создаём pending-платёж и возвращаем redirect_url на эмулятор.
+     * Для cash — зачисляем немедленно (администратор принял наличные).
+     */
+    public function topupBalance(Request $request, int $id): JsonResponse
+    {
+        $client = Client::findOrFail($id);
+
+        // Клиент может пополнять только свой баланс
+        if (auth()->user()->hasRole('client')) {
+            $authClient = auth()->user()->person?->client;
+            if (!$authClient || $authClient->person_id !== $client->person_id) {
+                return response()->json(['message' => 'Доступ запрещён'], 403);
+            }
+        }
+
+        $data = $request->validate([
+            'amount'         => 'required|numeric|min:100|max:999999.99',
+            'payment_method' => 'required|in:online_sbp,card_terminal,cash',
+        ]);
+
+        $method = $data['payment_method'];
+        $amount = (float) $data['amount'];
+        $needsAcquiring = in_array($method, ['online_sbp', 'card_terminal'], true);
+
+        $payment = Payment::create([
+            'client_id'      => $client->person_id,
+            'purpose'        => 'balance_topup',
+            'amount'         => $amount,
+            'paid_at'        => now(),
+            'payment_method' => $method,
+            'status'         => $needsAcquiring ? 'pending' : 'success',
+            'transaction_id' => 'TXN-' . strtoupper(uniqid()),
+        ]);
+
+        if (!$needsAcquiring) {
+            $client->increment('balance', $amount);
+            return response()->json([
+                'message' => "Баланс пополнен на " . number_format($amount, 0, '.', ' ') . " ₽",
+                'balance' => (float) $client->fresh()->balance,
+            ]);
+        }
+
+        $frontend = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+
+        return response()->json([
+            'message'      => 'Ожидание оплаты',
+            'payment'      => ['id' => $payment->id, 'amount' => $payment->amount],
+            'redirect_url' => "{$frontend}/payment/{$payment->id}",
+        ]);
+    }
+
+    /**
      * Форматирование клиента для JSON-ответа.
      */
     private function formatClient(Client $client): array
@@ -247,6 +303,7 @@ class ClientController extends Controller
             'birth_date'        => $person->birth_date?->toDateString(),
             'registration_date' => $client->registration_date->toDateString(),
             'status'            => $client->status,
+            'balance'           => (float) ($client->balance ?? 0),
             'remaining_visits'  => $client->getRemainingVisits(),
 
             // Паспортные данные

@@ -79,6 +79,10 @@ Route::prefix('v1')->group(function () {
             // Учётные данные клиента (админ + владелец)
             Route::get('/{id}/credentials', [MembershipController::class, 'clientCredentials'])
                 ->middleware('role:admin,owner');
+
+            // Пополнение баланса клиента
+            Route::post('/{id}/balance/topup', [ClientController::class, 'topupBalance'])
+                ->middleware('role:admin,owner,client');
         });
 
         // Расписание

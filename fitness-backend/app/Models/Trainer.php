@@ -18,7 +18,15 @@ class Trainer extends Model
         'specialization',
         'contact_phone',
         'description',
+        'hourly_rate',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'hourly_rate' => 'decimal:2',
+        ];
+    }
 
     // ── Связи ──────────────────────────────────────────
 

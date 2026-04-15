@@ -11,6 +11,19 @@ class SessionRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Конвертируем пустые строки в null до валидации,
+     * чтобы PostgreSQL не получал пустую строку вместо bigint.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'hall_id'    => $this->hall_id    ?: null,
+            'trainer_id' => $this->trainer_id ?: null,
+            'client_id'  => $this->client_id  ?: null,
+        ]);
+    }
+
     public function rules(): array
     {
         // PUT — всё необязательно
@@ -45,7 +58,8 @@ class SessionRequest extends FormRequest
         }
 
         if ($this->input('type') === 'personal') {
-            $rules['client_id'] = 'required|exists:clients,person_id';
+            $rules['client_id']       = 'required|exists:clients,person_id';
+            $rules['payment_method']  = 'nullable|in:balance,cash,card_terminal,online_sbp';
         }
 
         return $rules;

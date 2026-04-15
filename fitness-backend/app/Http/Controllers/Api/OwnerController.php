@@ -61,6 +61,7 @@ class OwnerController extends Controller
             // trainer
             'specialization' => 'nullable|string|max:150',
             'description'    => 'nullable|string|max:1000',
+            'hourly_rate'    => 'nullable|numeric|min:0|max:99999.99',
         ]);
 
         $password = $data['password'] ?? Str::random(10);
@@ -94,6 +95,7 @@ class OwnerController extends Controller
                     'specialization' => $data['specialization'] ?? null,
                     'contact_phone'  => $data['phone'] ?? null,
                     'description'    => $data['description'] ?? null,
+                    'hourly_rate'    => $data['hourly_rate'] ?? null,
                 ]);
             }
         });
@@ -123,6 +125,7 @@ class OwnerController extends Controller
             'position'       => 'sometimes|nullable|string|max:100',
             'specialization' => 'sometimes|nullable|string|max:150',
             'description'    => 'sometimes|nullable|string|max:1000',
+            'hourly_rate'    => 'sometimes|nullable|numeric|min:0|max:99999.99',
         ]);
 
         DB::transaction(function () use ($user, $data) {
@@ -146,6 +149,7 @@ class OwnerController extends Controller
                     if (isset($data['specialization'])) $trainerUpdate['specialization'] = $data['specialization'];
                     if (isset($data['description']))    $trainerUpdate['description']     = $data['description'];
                     if (isset($data['phone']))           $trainerUpdate['contact_phone']   = $data['phone'];
+                    if (array_key_exists('hourly_rate', $data)) $trainerUpdate['hourly_rate'] = $data['hourly_rate'];
                     if ($trainerUpdate) $user->person->trainer->update($trainerUpdate);
                 }
             }
@@ -197,6 +201,7 @@ class OwnerController extends Controller
         if ($u->person?->trainer) {
             $result['specialization'] = $u->person->trainer->specialization;
             $result['description']    = $u->person->trainer->description;
+            $result['hourly_rate']    = $u->person->trainer->hourly_rate;
         }
 
         return $result;

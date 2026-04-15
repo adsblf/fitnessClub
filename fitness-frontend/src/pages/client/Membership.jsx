@@ -51,7 +51,16 @@ export default function ClientMembership() {
   const [memberships, setMemberships] = useState([]);
   const [membershipTypes, setMembershipTypes] = useState([]);
   const [visits, setVisits] = useState([]);
+  const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Balance top-up form
+  const [topupAmount, setTopupAmount] = useState("");
+  const [topupMethod, setTopupMethod] = useState("online_sbp");
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupError, setTopupError] = useState(null);
+  const [topupResult, setTopupResult] = useState(null); // null | 'success' | 'cancelled' | 'timeout'
+  const [pendingTopupId, setPendingTopupId] = useState(null);
 
   // Freeze form
   const [freezeDays, setFreezeDays] = useState(14);
@@ -77,14 +86,16 @@ export default function ClientMembership() {
     if (!user) return;
     setLoading(true);
     try {
-      const [membRes, typesRes, visitsRes] = await Promise.all([
+      const [membRes, typesRes, visitsRes, profileRes] = await Promise.all([
         clientsApi.memberships(user.id),
         membershipApi.types(),
         clientsApi.visits(user.id),
+        clientsApi.get(user.id),
       ]);
       setMemberships(membRes.data.data || []);
       setMembershipTypes((typesRes.data.data || []).filter(t => !t.is_trial));
       setVisits(visitsRes.data.data || []);
+      setBalance(profileRes.data.data?.balance ?? 0);
     } catch {
       // ignore
     } finally {
@@ -139,6 +150,62 @@ export default function ClientMembership() {
     }, 2000);
     return () => clearInterval(interval);
   }, [pendingPayId, load]);
+
+  // Poll topup payment status
+  useEffect(() => {
+    if (!pendingTopupId) return;
+    let attempts = 0;
+    const max = 90;
+    const interval = setInterval(async () => {
+      attempts++;
+      if (attempts > max) {
+        clearInterval(interval);
+        setPendingTopupId(null);
+        setTopupResult("timeout");
+        return;
+      }
+      try {
+        const res = await paymentsApi.status(pendingTopupId);
+        const st = res.data.data.status;
+        if (st === "success") {
+          clearInterval(interval);
+          setPendingTopupId(null);
+          setTopupResult("success");
+          setTopupAmount("");
+          load();
+        } else if (st === "cancelled") {
+          clearInterval(interval);
+          setPendingTopupId(null);
+          setTopupResult("cancelled");
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [pendingTopupId, load]);
+
+  async function handleTopup() {
+    const amount = Number(topupAmount);
+    if (!amount || amount < 100) { setTopupError("Минимальная сумма — 100 ₽"); return; }
+    setTopupLoading(true);
+    setTopupError(null);
+    setTopupResult(null);
+    try {
+      const res = await clientsApi.topupBalance(user.id, { amount, payment_method: topupMethod });
+      if (res.data.redirect_url) {
+        window.open(res.data.redirect_url, "_blank");
+        setPendingTopupId(res.data.payment.id);
+      } else {
+        // cash — immediate
+        setTopupResult("success");
+        setTopupAmount("");
+        load();
+      }
+    } catch (err) {
+      setTopupError(err.response?.data?.message || "Ошибка при пополнении");
+    } finally {
+      setTopupLoading(false);
+    }
+  }
 
   // ── Active membership ──────────────────────────────────────────────
   const activeMembership = memberships.find(
@@ -285,6 +352,92 @@ export default function ClientMembership() {
           <p className="text-xs mt-1">Приобретите абонемент ниже</p>
         </div>
       )}
+
+      {/* ── Balance Section ─────────────────────────────────────── */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Баланс</h3>
+            <p className="text-xs text-zinc-400 mt-0.5">Для оплаты персональных тренировок</p>
+          </div>
+          <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+            {Number(balance).toLocaleString("ru-RU")} ₽
+          </div>
+        </div>
+
+        {topupResult === "success" && (
+          <div className="text-sm px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">
+            ✓ Баланс успешно пополнен
+          </div>
+        )}
+        {topupResult === "cancelled" && (
+          <div className="text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400">
+            Пополнение отменено
+          </div>
+        )}
+        {topupResult === "timeout" && (
+          <div className="text-sm px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+            Время ожидания истекло. Проверьте статус платежа.
+          </div>
+        )}
+        {pendingTopupId && (
+          <div className="text-sm px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
+            ⏳ Ожидание подтверждения оплаты...
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1.5">Сумма пополнения, ₽</label>
+            <input
+              type="number"
+              value={topupAmount}
+              onChange={e => { setTopupAmount(e.target.value); setTopupResult(null); }}
+              placeholder="1000"
+              min="100"
+              step="100"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1.5">Способ оплаты</label>
+            <div className="flex gap-2">
+              {[
+                { value: "online_sbp",    label: "СБП",         icon: "⚡" },
+                { value: "card_terminal", label: "Банковская карта", icon: "💳" },
+              ].map(m => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setTopupMethod(m.value)}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border-2 transition-colors ${
+                    topupMethod === m.value
+                      ? "border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800"
+                      : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-400"
+                  }`}
+                >
+                  {m.icon} {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {topupError && (
+            <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+              {topupError}
+            </div>
+          )}
+
+          <button
+            onClick={handleTopup}
+            disabled={topupLoading || !!pendingTopupId || !topupAmount}
+            className="w-full py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:opacity-80 disabled:opacity-50 transition-opacity"
+          >
+            {topupLoading ? "Обработка..." : pendingTopupId ? "Ожидание оплаты..." : "Пополнить баланс"}
+          </button>
+        </div>
+      </div>
 
       {/* ── Freeze Section ──────────────────────────────────────── */}
       {activeMembership && (
