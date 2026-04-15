@@ -249,21 +249,19 @@ class DashboardController extends Controller
             ->whereDate('starts_at', '>=', $monthStart)
             ->where('status', 'completed')
             ->withCount(['visits'])
-            ->orderByDesc('visits_count')
-            ->limit(20)
             ->get()
-            ->filter(fn($s) => $s->visits_count > 0)
-            ->take(5)
-            ->map(fn($s) => [
-                'name'     => $s->groupSession->name ?? 'Занятие #' . $s->id,
-                'date'     => $s->starts_at->toDateString(),
-                'time'     => $s->starts_at->format('H:i'),
-                'visits'   => $s->visits_count,
-                'capacity' => $s->groupSession->max_participants ?? 0,
-                'percent'  => ($s->groupSession->max_participants ?? 0) > 0
-                    ? round($s->visits_count / $s->groupSession->max_participants * 100)
+            ->filter(fn($s) => $s->groupSession !== null)
+            ->groupBy(fn($s) => $s->groupSession->name)
+            ->map(fn($sessions, $name) => [
+                'name'     => $name,
+                'visits'   => $sessions->sum('visits_count'),
+                'capacity' => ($sessions->first()->groupSession->max_participants ?? 0) * $sessions->count(),
+                'percent'  => (($sessions->first()->groupSession->max_participants ?? 0) * $sessions->count()) > 0
+                    ? round($sessions->sum('visits_count') / (($sessions->first()->groupSession->max_participants ?? 0) * $sessions->count()) * 100)
                     : 0,
             ])
+            ->sortByDesc('visits')
+            ->take(5)
             ->values()
             ->toArray();
     }
