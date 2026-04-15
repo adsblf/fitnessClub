@@ -87,7 +87,7 @@ export default function SessionVisitBlock({ session, onUpdated }) {
       }
 
       setEditingState("done");
-      onUpdated();
+      if (toSave.length > 0) onUpdated();
     } catch (err) {
       setSaveError(err.response?.data?.message || "Ошибка при сохранении");
     } finally {
