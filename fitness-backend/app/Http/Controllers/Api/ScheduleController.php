@@ -391,8 +391,8 @@ class ScheduleController extends Controller
         }
         $starts = Carbon::parse($data['starts_at']);
         $ends   = Carbon::parse($data['ends_at']);
-        $hours  = $ends->diffInMinutes($starts) / 60;
-        return round((float) $trainer->hourly_rate * $hours, 2);
+        $hours  = $starts->diffInMinutes($ends) / 60; // $starts→$ends: positive when end > start
+        return round((float) $trainer->hourly_rate * abs($hours), 2);
     }
 
     /**
