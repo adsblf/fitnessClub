@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { bookingsApi } from "../../api/bookings";
+import { scheduleApi } from "../../api/schedule";
 import { TZ } from "../../lib/tz";
 
 const BOOKING_STATUS_MAP = {
@@ -129,6 +130,7 @@ function BookingCard({ booking, onAction }) {
 
       {/* Кнопки действия */}
       <div className="flex gap-2 mt-auto pt-2">
+        {/* Отмена обычной записи (групповое занятие) */}
         {isUpcoming && booking.status === "confirmed" && booking.source !== 'personal_session' && (
           <button
             onClick={() => onAction("cancel", booking.id)}
@@ -137,6 +139,26 @@ function BookingCard({ booking, onAction }) {
             Отменить запись
           </button>
         )}
+        {/* Отмена персональной тренировки */}
+        {isUpcoming && booking.source === 'personal_session' && booking.status === 'confirmed' && (() => {
+          const hoursLeft = (startDate - now) / 3600000;
+          const canCancel = hoursLeft >= 24;
+          return canCancel ? (
+            <button
+              onClick={() => onAction("cancel-personal", booking.session_id)}
+              className="flex-1 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+            >
+              Отменить тренировку
+            </button>
+          ) : (
+            <div
+              title="Отменить можно не позднее чем за 24 часа до начала. Обратитесь к администратору или тренеру."
+              className="flex-1 px-3 py-2 text-xs font-medium text-zinc-400 dark:text-zinc-600 border border-zinc-200 dark:border-zinc-700 rounded-lg cursor-not-allowed text-center"
+            >
+              Отмена недоступна (менее 24 ч)
+            </div>
+          );
+        })()}
         <button
           onClick={() => onAction("view", booking.id)}
           className="flex-1 px-3 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
@@ -347,8 +369,22 @@ export default function Bookings() {
             alert("Ошибка при отмене записи");
           });
       }
+    } else if (action === "cancel-personal") {
+      if (confirm("Вы уверены, что хотите отменить персональную тренировку? Средства будут возвращены на ваш внутренний баланс.")) {
+        scheduleApi
+          .cancel(bookingId)
+          .then((res) => {
+            const msg = res.data?.message ?? "Тренировка отменена";
+            alert(msg);
+            loadBookings();
+          })
+          .catch((err) => {
+            const msg = err.response?.data?.message ?? "Ошибка при отмене тренировки";
+            alert(msg);
+          });
+      }
     } else if (action === "view") {
-      const booking = bookings.find(b => b.id === bookingId);
+      const booking = bookings.find(b => b.id === bookingId || b.session_id === bookingId);
       navigate(`/client/schedule/book/${booking?.session_id}`, { state: { booking } });
     }
   }

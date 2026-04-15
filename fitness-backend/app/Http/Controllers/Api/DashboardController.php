@@ -39,14 +39,14 @@ class DashboardController extends Controller
 
         return response()->json([
             'data' => [
-                // Выручка сегодня
+                // Выручка сегодня (за вычетом возвратов)
                 'revenue_today' => Payment::whereDate('paid_at', $today)
-                    ->where('status', 'success')
+                    ->whereIn('status', ['success', 'refund'])
                     ->sum('amount'),
 
-                // Выручка за месяц
+                // Выручка за месяц (за вычетом возвратов)
                 'revenue_month' => Payment::whereDate('paid_at', '>=', $monthStart)
-                    ->where('status', 'success')
+                    ->whereIn('status', ['success', 'refund'])
                     ->sum('amount'),
 
                 // Посещений сегодня
@@ -109,7 +109,7 @@ class DashboardController extends Controller
                 // ── Выручка за прошлый месяц ──
                 'revenue_last_month' => Payment::whereDate('paid_at', '>=', now()->subMonth()->startOfMonth()->toDateString())
                     ->whereDate('paid_at', '<', $monthStart)
-                    ->where('status', 'success')
+                    ->whereIn('status', ['success', 'refund'])
                     ->sum('amount'),
             ],
         ]);
@@ -138,7 +138,7 @@ class DashboardController extends Controller
             $result[] = [
                 'date'   => $date,
                 'amount' => (float) Payment::whereDate('paid_at', $date)
-                    ->where('status', 'success')
+                    ->whereIn('status', ['success', 'refund'])
                     ->sum('amount'),
             ];
         }
@@ -300,7 +300,8 @@ class DashboardController extends Controller
         $perPage  = min((int) $request->input('per_page', 25), 100);
 
         // ── Базовый запрос ──────────────────────────────────────────────
-        $baseQuery = Payment::where('status', 'success');
+        // Включаем успешные платежи и возвраты (возвраты имеют отрицательную сумму)
+        $baseQuery = Payment::whereIn('status', ['success', 'refund']);
 
         if ($dateFrom) $baseQuery->whereDate('paid_at', '>=', $dateFrom);
         if ($dateTo)   $baseQuery->whereDate('paid_at', '<=', $dateTo);
@@ -318,7 +319,7 @@ class DashboardController extends Controller
                 DB::raw('SUM(amount) as total_amount'),
                 DB::raw('COUNT(*) as sales_count')
             )
-            ->where('status', 'success');
+            ->whereIn('status', ['success', 'refund']);
         if ($dateFrom) $topClientsQuery->whereDate('paid_at', '>=', $dateFrom);
         if ($dateTo)   $topClientsQuery->whereDate('paid_at', '<=', $dateTo);
 
@@ -351,7 +352,7 @@ class DashboardController extends Controller
                     DB::raw('AVG(amount) as avg_amount'),
                     DB::raw('MAX(paid_at) as last_purchase')
                 )
-                ->where('status', 'success');
+                ->whereIn('status', ['success', 'refund']);
             if ($dateFrom) $clientsQuery->whereDate('paid_at', '>=', $dateFrom);
             if ($dateTo)   $clientsQuery->whereDate('paid_at', '<=', $dateTo);
             if ($clientId) $clientsQuery->where('client_id', $clientId);
@@ -410,6 +411,9 @@ class DashboardController extends Controller
             'payment_method'   => $p->payment_method,
             'promo_code'       => $p->promoCode?->code ?? null,
             'transaction_id'   => $p->transaction_id,
+            'purpose'          => $p->purpose ?? 'membership',
+            'status'           => $p->status,
+            'is_refund'        => $p->status === 'refund',
         ]);
 
         return response()->json([

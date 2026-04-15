@@ -92,7 +92,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/',             [ScheduleController::class, 'store'])->middleware('role:admin,trainer,owner');
             Route::put('/{id}',          [ScheduleController::class, 'update'])->middleware('role:admin,trainer,owner');
             Route::post('/auto-complete',[ScheduleController::class, 'autoComplete'])->middleware('role:admin,trainer,owner');
-            Route::post('/{id}/cancel',  [ScheduleController::class, 'cancel'])->middleware('role:admin,trainer,owner');
+            Route::post('/{id}/cancel',  [ScheduleController::class, 'cancel'])->middleware('role:admin,trainer,owner,client');
         });
 
         // Справочники

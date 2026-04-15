@@ -15,6 +15,7 @@ use App\Models\Trainer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ScheduleController extends Controller
 {
@@ -313,17 +314,47 @@ class ScheduleController extends Controller
 
     /**
      * POST /api/v1/schedule/{id}/cancel
-     * Отменить занятие.
+     * Отменить занятие (администратор, тренер или клиент — только своя персональная тренировка).
+     *
+     * Правила для клиента:
+     * - Можно отменить только свою персональную тренировку.
+     * - Отмена возможна не позднее чем за 24 часа до начала.
+     * - При отмене деньги возвращаются на внутренний баланс клиента.
+     *
+     * Правила для администратора / тренера:
+     * - Могут отменить любое занятие в любое время.
+     * - Если до начала трениировки >= 24 часов — деньги возвращаются клиенту.
+     * - Если < 24 часов — деньги НЕ возвращаются.
      */
     public function cancel(int $id): JsonResponse
     {
-        $session = Session::findOrFail($id);
+        $session = Session::with(['personalSession.client'])->findOrFail($id);
 
-        // Тренер может отменять только свои занятия
-        if ($this->isTrainerOnly()) {
+        $isClientCalling = $this->isClientOnly();
+        $hoursUntilStart = now()->diffInHours($session->starts_at, false);
+
+        if ($isClientCalling) {
+            // Клиент может отменять только свою персональную тренировку
+            if (!$session->isPersonal() || !$session->personalSession) {
+                return response()->json(['message' => 'Вы можете отменять только свои персональные тренировки'], 403);
+            }
             $personId = $this->getAuthPersonId();
-            if (!$personId || $session->trainer_id !== $personId) {
-                return response()->json(['message' => 'Вы можете отменять только свои занятия'], 403);
+            if ($session->personalSession->client_id !== $personId) {
+                return response()->json(['message' => 'Вы можете отменять только свои персональные тренировки'], 403);
+            }
+            // Ограничение: не позднее 24 часов до начала
+            if ($hoursUntilStart < 24) {
+                return response()->json([
+                    'message' => 'Отменить тренировку можно не позднее чем за 24 часа до её начала',
+                ], 403);
+            }
+        } else {
+            // Тренер может отменять только свои занятия
+            if ($this->isTrainerOnly()) {
+                $personId = $this->getAuthPersonId();
+                if (!$personId || $session->trainer_id !== $personId) {
+                    return response()->json(['message' => 'Вы можете отменять только свои занятия'], 403);
+                }
             }
         }
 
@@ -331,12 +362,54 @@ class ScheduleController extends Controller
             return response()->json(['message' => 'Занятие уже отменено'], 409);
         }
 
+        // Возврат средств: только для персональных занятий при отмене за >= 24 часа
+        $shouldRefund = $session->isPersonal() && $hoursUntilStart >= 24;
+
         $session->update(['status' => 'cancelled']);
 
         // Отменяем все записи на это занятие
         $session->bookings()
             ->whereIn('status', ['booked', 'confirmed'])
             ->update(['status' => 'cancelled']);
+
+        // Обработка возврата средств
+        if ($shouldRefund && $session->personalSession) {
+            $client = $session->personalSession->client;
+
+            $originalPayment = Payment::where('personal_session_id', $session->id)
+                ->where('status', 'success')
+                ->where('purpose', 'personal_session')
+                ->first();
+
+            if ($originalPayment && $client) {
+                DB::transaction(function () use ($client, $session, $originalPayment) {
+                    // Зачисляем сумму на внутренний баланс клиента
+                    $client->increment('balance', $originalPayment->amount);
+
+                    // Фиксируем возврат в статистике (отрицательная сумма = убыток)
+                    Payment::create([
+                        'client_id'           => $client->person_id,
+                        'personal_session_id' => $session->id,
+                        'purpose'             => 'personal_session_refund',
+                        'amount'              => -$originalPayment->amount,
+                        'paid_at'             => now(),
+                        'payment_method'      => $originalPayment->payment_method,
+                        'status'              => 'refund',
+                        'transaction_id'      => 'REF-' . strtoupper(uniqid()),
+                    ]);
+                });
+
+                $newBalance = (float) $client->fresh()->balance;
+
+                return response()->json([
+                    'message' => 'Занятие отменено. Средства ' . number_format((float) $originalPayment->amount, 2, '.', '') . ' ₽ возвращены на баланс клиента.',
+                    'refund'  => [
+                        'amount'      => (float) $originalPayment->amount,
+                        'new_balance' => $newBalance,
+                    ],
+                ]);
+            }
+        }
 
         return response()->json(['message' => 'Занятие отменено']);
     }
@@ -405,6 +478,19 @@ class ScheduleController extends Controller
         return in_array('trainer', $roles)
             && !in_array('admin', $roles)
             && !in_array('owner', $roles);
+    }
+
+    /**
+     * Возвращает true, если текущий пользователь — клиент без прав admin/owner/trainer.
+     */
+    private function isClientOnly(): bool
+    {
+        $user = auth()->user();
+        $roles = $user->roles->pluck('name')->toArray();
+        return in_array('client', $roles)
+            && !in_array('admin', $roles)
+            && !in_array('owner', $roles)
+            && !in_array('trainer', $roles);
     }
 
     /**
