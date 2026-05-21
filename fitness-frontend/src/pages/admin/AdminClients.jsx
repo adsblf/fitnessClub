@@ -157,6 +157,7 @@ function CreateClientModal({ onClose, onCreated }) {
     email: "",
     phone: "",
     birth_date: "",
+    personal_data_consent: false,
     password: "password",
     passport_series: "",
     passport_number: "",
@@ -201,6 +202,10 @@ function CreateClientModal({ onClose, onCreated }) {
       e.birth_date = "Укажите дату рождения";
     } else if (form.birth_date > new Date().toISOString().split("T")[0]) {
       e.birth_date = "Дата не может быть в будущем";
+    }
+
+    if (!form.personal_data_consent) {
+      e.personal_data_consent = "Необходимо подтвердить согласие";
     }
 
     // Паспорт — все поля либо пустые, либо валидные.
@@ -280,6 +285,18 @@ function CreateClientModal({ onClose, onCreated }) {
               </Field>
               <Field label="Дата рождения *" error={errors.birth_date}>
                 <input type="date" className="input" required value={form.birth_date} onChange={(e) => set("birth_date")(e.target.value)} />
+              </Field>
+              <Field error={errors.personal_data_consent}>
+                <label className="inline-flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300 select-none">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={form.personal_data_consent}
+                    onChange={(e) => set("personal_data_consent")(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                  />
+                  <span>Есть согласие на обработку персональных данных</span>
+                </label>
               </Field>
             </div>
 

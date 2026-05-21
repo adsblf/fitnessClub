@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 
 export default function Login() {
@@ -79,17 +79,14 @@ export default function Login() {
             {loading ? "Вход..." : "Войти"}
           </button>
 
-          <p className="text-center text-xs text-zinc-400">
-            Нет аккаунта?{" "}
-            <Link to="/register" className="text-zinc-700 dark:text-zinc-300 hover:underline">
-              Зарегистрироваться
-            </Link>
-          </p>
         </form>
 
-        <p className="text-center text-xs text-zinc-400 mt-4">
-          Демо: admin / password
-        </p>
+        <div className="text-center text-xs text-zinc-400 mt-4 space-y-1">
+          <p>Администратор: admin@fitclub.ru / password</p>
+          <p>Владелец: owner@fitclub.ru / password</p>
+          <p>Клиент: client1@fitclub.ru / password</p>
+          <p>Тренер: trainer1@fitclub.ru / password</p>
+        </div>
       </div>
     </div>
   );
