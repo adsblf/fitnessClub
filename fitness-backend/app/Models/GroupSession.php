@@ -30,7 +30,8 @@ class GroupSession extends Model
      */
     public function getRegisteredCount(): int
     {
-        return $this->session->bookings()
+        return Booking::query()
+            ->where('session_id', $this->session_id)
             ->where('status', 'confirmed')
             ->count();
     }

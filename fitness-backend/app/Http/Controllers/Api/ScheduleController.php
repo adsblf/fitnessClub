@@ -26,6 +26,11 @@ class ScheduleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Session::with(['hall', 'trainer.person', 'groupSession', 'personalSession.client.person'])
+            ->withCount([
+                'bookings as confirmed_bookings_count' => function ($q) {
+                    $q->where('status', 'confirmed');
+                },
+            ])
             ->orderBy('starts_at');
 
         // Фильтр по дате (по умолчанию — сегодня)
@@ -68,7 +73,11 @@ class ScheduleController extends Controller
                 if ($s->type !== 'group' || !$s->groupSession) {
                     return PHP_INT_MAX; // непосредственно групповые в конец
                 }
-                return $s->groupSession->getAvailableSlots();
+                $registered = isset($s->confirmed_bookings_count)
+                    ? (int) $s->confirmed_bookings_count
+                    : $s->bookings()->where('status', 'confirmed')->count();
+
+                return max(0, (int) $s->groupSession->max_participants - $registered);
             }, SORT_REGULAR, $sortSlots === 'desc')->values();
         }
 
@@ -89,6 +98,10 @@ class ScheduleController extends Controller
             'groupSession',
             'personalSession.client.person',
             'bookings.client.person',
+        ])->withCount([
+            'bookings as confirmed_bookings_count' => function ($q) {
+                $q->where('status', 'confirmed');
+            },
         ])->findOrFail($id);
 
         $data = $this->formatSession($session);
@@ -243,7 +256,16 @@ class ScheduleController extends Controller
             }
         }
 
-        $session->load(['hall', 'trainer.person', 'groupSession', 'personalSession.client.person']);
+        $session->load([
+            'hall',
+            'trainer.person',
+            'groupSession',
+            'personalSession.client.person',
+        ])->loadCount([
+            'bookings as confirmed_bookings_count' => function ($q) {
+                $q->where('status', 'confirmed');
+            },
+        ]);
 
         return response()->json([
             'message' => 'Занятие создано',
@@ -290,7 +312,16 @@ class ScheduleController extends Controller
             $session->personalSession->update(['client_id' => $data['client_id']]);
         }
 
-        $session->load(['hall', 'trainer.person', 'groupSession', 'personalSession.client.person']);
+        $session->load([
+            'hall',
+            'trainer.person',
+            'groupSession',
+            'personalSession.client.person',
+        ])->loadCount([
+            'bookings as confirmed_bookings_count' => function ($q) {
+                $q->where('status', 'confirmed');
+            },
+        ]);
 
         return response()->json([
             'message' => 'Занятие обновлено',
@@ -532,11 +563,14 @@ class ScheduleController extends Controller
 
         if ($session->type === 'group' && $session->groupSession) {
             $gs = $session->groupSession;
+            $registered = isset($session->confirmed_bookings_count)
+                ? (int) $session->confirmed_bookings_count
+                : $session->bookings()->where('status', 'confirmed')->count();
             $data['name']             = $gs->name;
             $data['difficulty_level'] = $gs->difficulty_level;
             $data['max_participants'] = $gs->max_participants;
-            $data['registered']       = $gs->getRegisteredCount();
-            $data['available_slots']  = $gs->getAvailableSlots();
+            $data['registered']       = $registered;
+            $data['available_slots']  = max(0, (int) $gs->max_participants - $registered);
         }
 
         if ($session->type === 'personal' && $session->personalSession) {
